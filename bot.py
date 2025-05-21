@@ -1,15 +1,15 @@
-
 import time
 import json
 from web3 import Web3
 from telegram import Bot
 from web3._utils.events import get_event_data
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 # ---------------- CONFIG ---------------- #
-TELEGRAM_BOT_TOKEN = '7675655366:AAGuj0XOv4uFMF3GPWxY9NZrdkX0PY9Er3Y'
-TELEGRAM_CHAT_ID = '1836773368'
-ETHEREUM_RPC_URL = 'https://mainnet.infura.io/v3/bc0f03db32124262bf703df3bf68db85'
+import os
+
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+ETHEREUM_RPC_URL = os.getenv('ETHEREUM_RPC_URL')
 
 WALLETS_TO_TRACK = {
     '0xd9aD5Acc883D8a67ab612B70C11abF33dD450A45': 'Frictionless Switch FRIC/ETH',
@@ -28,16 +28,19 @@ transfer_event_sig = w3.keccak(text="Transfer(address,address,uint256)").hex()
 
 # ---------------- UTILS ---------------- #
 def build_frictionless_message(tx_type, token_symbol, value, tx_hash, address):
-    wallet_label = WALLETS_TO_TRACK.get(address, None)
+        wallet_label = WALLETS_TO_TRACK.get(address, None)
     if not wallet_label:
         return None  # Skip unknown addresses entirely
     if tx_type == "incoming":
-        return (
-            f"🔔 *New Offer Created on the Frictionless Platform* ({wallet_label}, {GLOBAL_LABEL})\n"
-            f"Token: `{token_symbol}`\n"
+    return (
+            f"🔔 *New Offer Created on the Frictionless Platform* ({wallet_label}, {GLOBAL_LABEL})
+"
+            f"Token: `{token_symbol}`
+"
             f"Amount: `{value:.4f}`\n"
-            f"🔗 [View Transaction](https://etherscan.io/tx/{tx_hash})"
-        )
+            f"🔗 [View Transaction](https://etherscan.io/tx/{tx_hash})
+"
+                    )
     elif tx_type == "outgoing":
         return (
             f"🤝 *Contribution on offer wall* ({wallet_label}, {GLOBAL_LABEL})\n"
@@ -48,8 +51,10 @@ def build_frictionless_message(tx_type, token_symbol, value, tx_hash, address):
     else:
         return f"🔄 {value:.4f} {token_symbol} transfer detected."
 
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
 def notify(message, tx_type=None):
-    video_path = 'Friccy Whale.gif'
+    video_path = '/mnt/data/Friccy Whale.gif'  # Adjust path if needed
     if tx_type == "incoming":
         keyboard = [[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -124,4 +129,5 @@ if __name__ == '__main__':
         except Exception as e:
             print("Main loop error:", e)
             time.sleep(30)
+
 
