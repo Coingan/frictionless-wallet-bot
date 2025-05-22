@@ -3,44 +3,40 @@ import json
 from web3 import Web3
 from telegram import Bot
 from web3._utils.events import get_event_data
-
-# ---------------- CONFIG ---------------- #
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import os
 
+# ---------------- CONFIG ---------------- #
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 ETHEREUM_RPC_URL = os.getenv('ETHEREUM_RPC_URL')
 
 WALLETS_TO_TRACK = {
-    '0xd9aD5Acc883D8a67ab612B70C11abF33dD450A45': 'Frictionless Switch FRIC/ETH',
-    '0xda1916b0d6B209A143009214Cac95e771c4aa277': 'Frictionless Switch FRIC/ETH'
+    '0xd9aD5Acc883D8a67ab612B70C11abF33dD450A45': 'Switch --> FRIC/ETH',
+    '0xda1916b0d6B209A143009214Cac95e771c4aa277': 'Switch --> FRIC/ETH'
 }
 
-GLOBAL_LABEL = "Frictionless Whales"
+GLOBAL_LABEL = "Frictionless Whales POTC"
 
 ERC20_ABI = json.loads('[{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Transfer","type":"event"}]')
 
 # ---------------- SETUP ---------------- #
 w3 = Web3(Web3.HTTPProvider(ETHEREUM_RPC_URL))
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
-
 transfer_event_sig = w3.keccak(text="Transfer(address,address,uint256)").hex()
 
 # ---------------- UTILS ---------------- #
 def build_frictionless_message(tx_type, token_symbol, value, tx_hash, address):
-        wallet_label = WALLETS_TO_TRACK.get(address, None)
+    wallet_label = WALLETS_TO_TRACK.get(address, None)
     if not wallet_label:
         return None  # Skip unknown addresses entirely
     if tx_type == "incoming":
-    return (
-            f"🔔 *New Offer Created on the Frictionless Platform* ({wallet_label}, {GLOBAL_LABEL})
-"
-            f"Token: `{token_symbol}`
-"
+        return (
+            f"🔔 *New Offer Created on the Frictionless Platform* ({wallet_label}, {GLOBAL_LABEL})\n"
+            f"Token: `{token_symbol}`\n"
             f"Amount: `{value:.4f}`\n"
-            f"🔗 [View Transaction](https://etherscan.io/tx/{tx_hash})
-"
-                    )
+            f"🔗 [View Transaction](https://etherscan.io/tx/{tx_hash})"
+        )
     elif tx_type == "outgoing":
         return (
             f"🤝 *Contribution on offer wall* ({wallet_label}, {GLOBAL_LABEL})\n"
@@ -51,10 +47,8 @@ def build_frictionless_message(tx_type, token_symbol, value, tx_hash, address):
     else:
         return f"🔄 {value:.4f} {token_symbol} transfer detected."
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-
 def notify(message, tx_type=None):
-    video_path = '/mnt/data/Friccy Whale.gif'  # Adjust path if needed
+    video_path = '/mnt/data/Friccy Whale.gif'
     if tx_type == "incoming":
         keyboard = [[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -77,7 +71,6 @@ def check_blocks():
 
     for tx in block.transactions:
         try:
-            # Native ETH Transfers
             from_addr = tx['from']
             to_addr = tx['to']
             value = tx['value']
@@ -89,7 +82,6 @@ def check_blocks():
                 if message:
                     notify(message, tx_type)
 
-            # ERC20 Transfers
             receipt = w3.eth.get_transaction_receipt(tx.hash)
             for log in receipt.logs:
                 if log['topics'][0].hex() == transfer_event_sig:
@@ -129,5 +121,3 @@ if __name__ == '__main__':
         except Exception as e:
             print("Main loop error:", e)
             time.sleep(30)
-
-
