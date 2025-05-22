@@ -112,10 +112,12 @@ def check_blocks():
             for log in receipt.logs:
                 if log['topics'][0].hex() == transfer_event_sig:
                     try:
-                        decoded = get_event_data(w3.codec, ERC20_ABI[0], log)
-                        from_addr = decoded['args']['from']
-                        to_addr = decoded['args']['to']
-                        value = decoded['args']['value']
+                        transfer_event_abi = [abi for abi in ERC20_ABI if abi.get("type") == "event" and abi.get("name") == "Transfer"][0]
+                        event_contract = w3.eth.contract(abi=[transfer_event_abi])
+                        decoded_log = event_contract.events.Transfer().processLog(log)
+                        from_addr = decoded_log['args']['from']
+                        to_addr = decoded_log['args']['to']
+                        value = decoded_log['args']['value']
                         contract = w3.eth.contract(address=log['address'], abi=ERC20_ABI)
                         try:
                             token_symbol = contract.functions.symbol().call()
