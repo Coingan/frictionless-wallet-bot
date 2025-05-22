@@ -91,7 +91,10 @@ def check_blocks():
                         to_addr = decoded['args']['to']
                         value = decoded['args']['value']
                         contract = w3.eth.contract(address=log['address'], abi=ERC20_ABI)
-                        token_symbol = contract.functions.symbol().call()
+                        try:
+                            token_symbol = contract.functions.symbol().call()
+                        except:
+                            token_symbol = "UNKNOWN"
 
                         if to_addr in WALLETS_TO_TRACK:
                             tx_type = "incoming"
@@ -102,7 +105,11 @@ def check_blocks():
                         else:
                             continue
 
-                        value_human = value / (10 ** contract.functions.decimals().call())
+                        try:
+                            decimals = contract.functions.decimals().call()
+                        except:
+                            decimals = 18
+                        value_human = value / (10 ** decimals)
                         message = build_frictionless_message(tx_type, token_symbol, value_human, tx.hash.hex(), tracked_addr)
                         if message:
                             notify(message, tx_type)
