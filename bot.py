@@ -18,7 +18,33 @@ WALLETS_TO_TRACK = {
 
 GLOBAL_LABEL = "Frictionless Whales POTC"
 
-ERC20_ABI = json.loads('[{"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"type":"function"},{"constant":true,"inputs":[],"name":"decimals","outputs":[{"name":"","type":"uint8"}],"type":"function"},{"anonymous":false,"inputs":[{"indexed":true,"name":"from","type":"address"},{"indexed":true,"name":"to","type":"address"},{"indexed":false,"name":"value","type":"uint256"}],"name":"Transfer","type":"event"}]')
+ERC20_ABI = json.loads('''
+[
+  {
+    "type": "function",
+    "name": "symbol",
+    "inputs": [],
+    "outputs": [{"name": "", "type": "string"}],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "decimals",
+    "inputs": [],
+    "outputs": [{"name": "", "type": "uint8"}],
+    "stateMutability": "view"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true, "name": "from", "type": "address"},
+      {"indexed": true, "name": "to", "type": "address"},
+      {"indexed": false, "name": "value", "type": "uint256"}
+    ],
+    "name": "Transfer",
+    "type": "event"
+  }
+]''')
 
 # ---------------- SETUP ---------------- #
 w3 = Web3(Web3.HTTPProvider(ETHEREUM_RPC_URL))
