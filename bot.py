@@ -12,13 +12,13 @@ TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 ETHEREUM_RPC_URL = os.getenv('ETHEREUM_RPC_URL')
 
 WALLETS_TO_TRACK = {
-    '0xd9aD5Acc883D8a67ab612B70C11abF33dD450A45': 'Switch --> FRIC/ETH',
-    '0xda1916b0d6B209A143009214Cac95e771c4aa277': 'Switch --> FRIC/ETH'
+    '0xd9aD5Acc883D8a67ab612B70C11abF33dD450A45': 'Switch FRIC/ETH',
+    '0xda1916b0d6B209A143009214Cac95e771c4aa277': 'Switch FRIC/ETH'
 }
 
 GLOBAL_LABEL = "Frictionless Whales POTC"
 
-ERC20_ABI = json.loads('[{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Transfer","type":"event"}]')
+ERC20_ABI = json.loads('[{"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"type":"function"},{"constant":true,"inputs":[],"name":"decimals","outputs":[{"name":"","type":"uint8"}],"type":"function"},{"anonymous":false,"inputs":[{"indexed":true,"name":"from","type":"address"},{"indexed":true,"name":"to","type":"address"},{"indexed":false,"name":"value","type":"uint256"}],"name":"Transfer","type":"event"}]')
 
 # ---------------- SETUP ---------------- #
 w3 = Web3(Web3.HTTPProvider(ETHEREUM_RPC_URL))
