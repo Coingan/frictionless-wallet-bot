@@ -109,7 +109,7 @@ def check_blocks():
             for log in receipt.logs:
                 if len(log['topics']) != 3:
                     continue  # Skip non-ERC20 Transfer events
-if log['topics'][0].hex() == transfer_event_sig:
+                if log['topics'][0].hex() == transfer_event_sig:
                     try:
                         contract = w3.eth.contract(address=log['address'], abi=ERC20_ABI)
                         from web3._utils.events import get_event_data
