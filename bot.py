@@ -7,7 +7,7 @@ import os
 
 # ---------------- CONFIG ---------------- #
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+TELEGRAM_CHAT_IDS = os.getenv('TELEGRAM_CHAT_ID', '').split(',')
 ETHEREUM_RPC_URL = os.getenv('ETHEREUM_RPC_URL')
 
 WALLETS_TO_TRACK = {
@@ -83,8 +83,9 @@ def notify(message, tx_type=None):
         keyboard = []
         reply_markup = None
 
-    bot.send_animation(chat_id=TELEGRAM_CHAT_ID, animation=open(video_path, 'rb'))
-    bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode='Markdown', reply_markup=reply_markup)
+    for chat_id in TELEGRAM_CHAT_IDS:
+        bot.send_animation(chat_id=chat_id, animation=open(video_path, 'rb'))
+        bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown', reply_markup=reply_markup)
 
 # ---------------- MAIN LOGIC ---------------- #
 def check_blocks():
