@@ -2,7 +2,6 @@ import time
 import json
 from web3 import Web3
 from telegram import Bot
-from web3._utils.events import get_event_data
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import os
 
@@ -55,7 +54,7 @@ transfer_event_sig = w3.keccak(text="Transfer(address,address,uint256)").hex()
 def build_frictionless_message(tx_type, token_symbol, value, tx_hash, address):
     wallet_label = WALLETS_TO_TRACK.get(address, None)
     if not wallet_label:
-        return None  # Skip unknown addresses entirely
+        return None
     if tx_type == "incoming":
         return (
             f"🔔 *New Offer Created on the Frictionless Platform* ({wallet_label}, {GLOBAL_LABEL})\n"
@@ -70,24 +69,22 @@ def build_frictionless_message(tx_type, token_symbol, value, tx_hash, address):
             f"Amount: `{value:.4f}`\n"
             f"🔗 [View Transaction](https://etherscan.io/tx/{tx_hash})"
         )
-    else:
-        return f"🔄 {value:.4f} {token_symbol} transfer detected."
+    return None
 
 def notify(message, tx_type=None):
     video_path = '/mnt/data/Friccy Whale.gif'
     if tx_type == "incoming":
         keyboard = [[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        bot.send_animation(chat_id=TELEGRAM_CHAT_ID, animation=open(video_path, 'rb'))
-        bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode='Markdown', reply_markup=reply_markup)
     elif tx_type == "outgoing":
         keyboard = [[InlineKeyboardButton("💰 Create an OTC offer", url="https://app.frictionless.network/")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        bot.send_animation(chat_id=TELEGRAM_CHAT_ID, animation=open(video_path, 'rb'))
-        bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode='Markdown', reply_markup=reply_markup)
     else:
-        bot.send_animation(chat_id=TELEGRAM_CHAT_ID, animation=open(video_path, 'rb'))
-        bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode='Markdown')
+        keyboard = []
+        reply_markup = None
+
+    bot.send_animation(chat_id=TELEGRAM_CHAT_ID, animation=open(video_path, 'rb'))
+    bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message, parse_mode='Markdown', reply_markup=reply_markup)
 
 # ---------------- MAIN LOGIC ---------------- #
 def check_blocks():
@@ -112,17 +109,13 @@ def check_blocks():
             for log in receipt.logs:
                 if log['topics'][0].hex() == transfer_event_sig:
                     try:
-                        transfer_event_abi = [abi for abi in ERC20_ABI if abi.get("type") == "event" and abi.get("name") == "Transfer"][0]
-                        event_contract = w3.eth.contract(abi=[transfer_event_abi])
-                        decoded_log = event_contract.events.Transfer().processLog(log)
+                        contract = w3.eth.contract(address=log['address'], abi=ERC20_ABI)
+                        event = contract.events.Transfer()
+                        decoded_log = event.processLog(log)
+
                         from_addr = decoded_log['args']['from']
                         to_addr = decoded_log['args']['to']
                         value = decoded_log['args']['value']
-                        contract = w3.eth.contract(address=log['address'], abi=ERC20_ABI)
-                        try:
-                            token_symbol = contract.functions.symbol().call()
-                        except:
-                            token_symbol = "UNKNOWN"
 
                         if to_addr in WALLETS_TO_TRACK:
                             tx_type = "incoming"
@@ -134,14 +127,19 @@ def check_blocks():
                             continue
 
                         try:
+                            token_symbol = contract.functions.symbol().call()
+                        except:
+                            token_symbol = "UNKNOWN"
+
+                        try:
                             decimals = contract.functions.decimals().call()
                         except:
                             decimals = 18
+
                         value_human = value / (10 ** decimals)
                         message = build_frictionless_message(tx_type, token_symbol, value_human, tx.hash.hex(), tracked_addr)
                         if message:
                             notify(message, tx_type)
-
                     except Exception as e:
                         print("Decode error:", e)
         except Exception as e:
