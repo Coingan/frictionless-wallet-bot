@@ -94,6 +94,14 @@ def check_blocks():
     block = w3.eth.get_block(latest, full_transactions=True)
 
     for tx in block.transactions:
+        if tx['to'] is None and tx['from'] is None:
+            continue
+
+        to_address = Web3.toChecksumAddress(tx['to']) if tx['to'] else None
+        from_address = Web3.toChecksumAddress(tx['from']) if tx['from'] else None
+
+        if to_address not in WALLETS_TO_TRACK and from_address not in WALLETS_TO_TRACK:
+            continue
         try:
             from_addr = tx['from']
             to_addr = tx['to']
