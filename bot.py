@@ -89,7 +89,7 @@ def notify(message, tx_type=None):
 # ---------------- MAIN LOGIC ---------------- #
 def check_blocks():
     latest = w3.eth.block_number
-    print(f"Checking block {latest}")
+    print(f"Checking block {latest}", flush=True)
     block = w3.eth.get_block(latest, full_transactions=True)
 
     for tx in block.transactions:
