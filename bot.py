@@ -106,7 +106,15 @@ def check_blocks():
                 if message:
                     notify(message, tx_type)
 
-            receipt = w3.eth.get_transaction_receipt(tx.hash)
+            try:
+                receipt = w3.eth.get_transaction_receipt(tx.hash)
+            except Exception as e:
+                if '429' in str(e):
+                    print("Rate limited by RPC provider. Cooling down for 120 seconds.", flush=True)
+                    time.sleep(120)
+                    continue
+                else:
+                    raise
             for log in receipt.logs:
                 if len(log['topics']) != 3:
                     continue  # Skip non-ERC20 Transfer events
@@ -154,8 +162,7 @@ if __name__ == '__main__':
     while True:
         try:
             check_blocks()
-            time.sleep(30)
+            time.sleep(60)
         except Exception as e:
             print("Main loop error:", e)
             time.sleep(30)
-
