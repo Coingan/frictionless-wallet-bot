@@ -153,7 +153,8 @@ if __name__ == '__main__':
     while True:
         try:
             check_blocks()
-            time.sleep(15)
+            time.sleep(30)
         except Exception as e:
             print("Main loop error:", e)
             time.sleep(30)
+
