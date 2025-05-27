@@ -110,7 +110,9 @@ def check_blocks():
                 if log['topics'][0].hex() == transfer_event_sig:
                     try:
                         contract = w3.eth.contract(address=log['address'], abi=ERC20_ABI)
-                        decoded_log = contract.events.Transfer().process_log(log)
+                        from web3._utils.events import get_event_data
+                        transfer_event_abi = [abi for abi in ERC20_ABI if abi.get("type") == "event" and abi.get("name") == "Transfer"][0]
+                        decoded_log = get_event_data(w3.codec, transfer_event_abi, log)
 
                         from_addr = decoded_log['args']['from']
                         to_addr = decoded_log['args']['to']
