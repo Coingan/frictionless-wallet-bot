@@ -95,7 +95,8 @@ def check_blocks():
 
     for tx in block.transactions:
         print(f"Checking tx: from={tx['from']}, to={tx['to']}, value={tx['value']}", flush=True)
-if tx['to'] is None and tx['from'] is None:
+
+        if tx['to'] is None and tx['from'] is None:
             continue
 
         to_address = w3.to_checksum_address(tx['to']) if tx['to'] else None
@@ -176,4 +177,5 @@ if __name__ == '__main__':
         except Exception as e:
             print("Main loop error:", e)
             time.sleep(30)
+
 
