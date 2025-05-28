@@ -98,7 +98,6 @@ def check_blocks():
 
     for block_number in range(last_checked + 1, latest + 1):
         block = w3.eth.get_block(block_number, full_transactions=True)
-        for tx in block.transactions:
 
     for tx in block.transactions:
         if tx['to'] is None and tx['from'] is None:
@@ -189,4 +188,3 @@ if __name__ == '__main__':
         except Exception as e:
             print("Main loop error:", e)
             time.sleep(30)
-
