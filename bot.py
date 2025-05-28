@@ -159,8 +159,13 @@ def check_blocks():
                             decimals = 18
 
                         value_human = value / (10 ** decimals)
-                        message = build_frictionless_message(tx_type, token_symbol, value_human, tx.hash.hex(), tracked_addr)
                         if value == 0:
+                            continue  # Skip zero-value transfers
+                        unique_id = f"{tx.hash.hex()}-{tracked_addr}"
+                        if unique_id in seen_messages:
+                            continue  # Skip duplicates
+                        seen_messages.add(unique_id)
+                        message = build_frictionless_message(tx_type, token_symbol, value_human, tx.hash.hex(), tracked_addr)
                             continue  # Skip zero-value transfers
                         unique_id = f"{tx.hash.hex()}-{tracked_addr}"
                         if unique_id in seen_messages:
@@ -183,3 +188,4 @@ if __name__ == '__main__':
         except Exception as e:
             print("Main loop error:", e)
             time.sleep(30)
+
