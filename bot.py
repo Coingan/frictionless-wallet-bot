@@ -97,8 +97,8 @@ def check_blocks():
         if tx['to'] is None and tx['from'] is None:
             continue
 
-        to_address = Web3.toChecksumAddress(tx['to']) if tx['to'] else None
-        from_address = Web3.toChecksumAddress(tx['from']) if tx['from'] else None
+        to_address = w3.to_checksum_address(tx['to']) if tx['to'] else None
+        from_address = w3.to_checksum_address(tx['from']) if tx['from'] else None
 
         if to_address not in WALLETS_TO_TRACK and from_address not in WALLETS_TO_TRACK:
             continue
