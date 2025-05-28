@@ -137,8 +137,8 @@ def check_blocks():
                         transfer_event_abi = [abi for abi in ERC20_ABI if abi.get("type") == "event" and abi.get("name") == "Transfer"][0]
                         decoded_log = get_event_data(w3.codec, transfer_event_abi, log)
 
-                        from_addr = decoded_log['args']['from']
-                        to_addr = decoded_log['args']['to']
+                        from_addr = w3.to_checksum_address(decoded_log['args']['from'])
+                        to_addr = w3.to_checksum_address(decoded_log['args']['to'])
                         value = decoded_log['args']['value']
 
                         if to_addr in WALLETS_TO_TRACK:
@@ -163,6 +163,7 @@ def check_blocks():
                         value_human = value / (10 ** decimals)
                         message = build_frictionless_message(tx_type, token_symbol, value_human, tx.hash.hex(), tracked_addr)
                         if message:
+                            print(f"Sending ERC20 message: {message[:100]}...", flush=True)
                             notify(message, tx_type)
                     except Exception as e:
                         print("Decode error:", e)
@@ -178,5 +179,4 @@ if __name__ == '__main__':
         except Exception as e:
             print("Main loop error:", e)
             time.sleep(30)
-
 
