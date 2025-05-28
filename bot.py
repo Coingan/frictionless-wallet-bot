@@ -160,6 +160,7 @@ def check_blocks():
                         value_human = value / (10 ** decimals)
                         message = build_frictionless_message(tx_type, token_symbol, value_human, tx.hash.hex(), tracked_addr)
                         if message:
+                            print(f"Sending ERC20 message: {message[:100]}...", flush=True)
                             notify(message, tx_type)
                     except Exception as e:
                         print("Decode error:", e)
