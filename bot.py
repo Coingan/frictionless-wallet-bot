@@ -94,7 +94,8 @@ def check_blocks():
     block = w3.eth.get_block(latest, full_transactions=True)
 
     for tx in block.transactions:
-        print(f"Checking tx: from={tx['from']}, to={tx['to']}, value={tx['value']}", flush=True)
+        if tx['from'] in WALLETS_TO_TRACK or tx['to'] in WALLETS_TO_TRACK:
+            print(f"Checking tracked tx: from={tx['from']}, to={tx['to']}, value={tx['value']}", flush=True)
 
         if tx['to'] is None and tx['from'] is None:
             continue
