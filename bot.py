@@ -94,7 +94,8 @@ def check_blocks():
     block = w3.eth.get_block(latest, full_transactions=True)
 
     for tx in block.transactions:
-        if tx['to'] is None and tx['from'] is None:
+        print(f"Checking tx: from={tx['from']}, to={tx['to']}, value={tx['value']}", flush=True)
+if tx['to'] is None and tx['from'] is None:
             continue
 
         to_address = w3.to_checksum_address(tx['to']) if tx['to'] else None
@@ -175,3 +176,4 @@ if __name__ == '__main__':
         except Exception as e:
             print("Main loop error:", e)
             time.sleep(30)
+
