@@ -166,11 +166,6 @@ def check_blocks():
                             continue  # Skip duplicates
                         seen_messages.add(unique_id)
                         message = build_frictionless_message(tx_type, token_symbol, value_human, tx.hash.hex(), tracked_addr)
-                            continue  # Skip zero-value transfers
-                        unique_id = f"{tx.hash.hex()}-{tracked_addr}"
-                        if unique_id in seen_messages:
-                            continue  # Skip duplicates
-                        seen_messages.add(unique_id)
                         if message:
                             print(f"Sending ERC20 message: {message[:100]}...", flush=True)
                             notify(message, tx_type)
