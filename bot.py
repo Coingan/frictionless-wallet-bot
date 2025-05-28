@@ -74,10 +74,10 @@ def build_frictionless_message(tx_type, token_symbol, value, tx_hash, address):
 def notify(message, tx_type=None):
     video_path = 'Friccy_whale.gif'
     if tx_type == "incoming":
-        keyboard = [[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/")]]
+        keyboard = [[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/contribute")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
     elif tx_type == "outgoing":
-        keyboard = [[InlineKeyboardButton("💰 Create an OTC offer", url="https://app.frictionless.network/")]]
+        keyboard = [[InlineKeyboardButton("💰 Create an OTC offer", url="https://app.frictionless.network/create")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
     else:
         keyboard = []
@@ -92,6 +92,7 @@ def check_blocks():
     latest = w3.eth.block_number
     print(f"Checking block {latest}", flush=True)
     block = w3.eth.get_block(latest, full_transactions=True)
+    seen_messages = set()  # to prevent duplicates
 
     for tx in block.transactions:
         if tx['to'] is None and tx['from'] is None:
@@ -159,6 +160,12 @@ def check_blocks():
 
                         value_human = value / (10 ** decimals)
                         message = build_frictionless_message(tx_type, token_symbol, value_human, tx.hash.hex(), tracked_addr)
+                        if value == 0:
+                            continue  # Skip zero-value transfers
+                        unique_id = f"{tx.hash.hex()}-{tracked_addr}"
+                        if unique_id in seen_messages:
+                            continue  # Skip duplicates
+                        seen_messages.add(unique_id)
                         if message:
                             print(f"Sending ERC20 message: {message[:100]}...", flush=True)
                             notify(message, tx_type)
