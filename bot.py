@@ -106,7 +106,7 @@ def check_blocks():
             from_addr = tx['from']
             to_addr = tx['to']
             value = tx['value']
-            if value > 0 and (from_addr in WALLETS_TO_TRACK or to_addr in WALLETS_TO_TRACK):
+            if from_addr in WALLETS_TO_TRACK or to_addr in WALLETS_TO_TRACK:
                 tx_type = "incoming" if to_addr in WALLETS_TO_TRACK else "outgoing"
                 tracked_addr = to_addr if tx_type == "incoming" else from_addr
                 value_eth = w3.from_wei(value, 'ether')
