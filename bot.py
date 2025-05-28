@@ -112,7 +112,8 @@ def check_blocks():
                 value_eth = w3.from_wei(value, 'ether')
                 message = build_frictionless_message(tx_type, 'ETH', value_eth, tx.hash.hex(), tracked_addr)
                 if message:
-                    notify(message, tx_type)
+                            print(f"Sending message: {message[:100]}...", flush=True)
+                            notify(message, tx_type)
 
             try:
                 receipt = w3.eth.get_transaction_receipt(tx.hash)
