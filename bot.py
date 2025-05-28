@@ -72,7 +72,7 @@ def build_frictionless_message(tx_type, token_symbol, value, tx_hash, address):
     return None
 
 def notify(message, tx_type=None):
-    video_path = '/mnt/data/Friccy Whale.gif'
+    video_path = 'Friccy Whale new.gif'
     if tx_type == "incoming":
         keyboard = [[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
