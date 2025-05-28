@@ -88,11 +88,17 @@ def notify(message, tx_type=None):
         bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown', reply_markup=reply_markup)
 
 # ---------------- MAIN LOGIC ---------------- #
+last_checked = w3.eth.block_number - 1
+
 def check_blocks():
+    global last_checked
     latest = w3.eth.block_number
-    print(f"Checking block {latest}", flush=True)
-    block = w3.eth.get_block(latest, full_transactions=True)
+    print(f"Checking blocks {last_checked + 1} to {latest}", flush=True)
     seen_messages = set()  # to prevent duplicates
+
+    for block_number in range(last_checked + 1, latest + 1):
+        block = w3.eth.get_block(block_number, full_transactions=True)
+        for tx in block.transactions:
 
     for tx in block.transactions:
         if tx['to'] is None and tx['from'] is None:
