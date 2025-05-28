@@ -72,7 +72,7 @@ def build_frictionless_message(tx_type, token_symbol, value, tx_hash, address):
     return None
 
 def notify(message, tx_type=None):
-    video_path = 'Friccy Whale new.gif'
+    video_path = 'Friccy_whale.gif'
     if tx_type == "incoming":
         keyboard = [[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -84,10 +84,7 @@ def notify(message, tx_type=None):
         reply_markup = None
 
     for chat_id in TELEGRAM_CHAT_IDS:
-        try:
-            bot.send_animation(chat_id=chat_id, animation=open(video_path, 'rb'))
-        except Exception as e:
-            print(f"GIF send failed: {e}", flush=True)
+        bot.send_animation(chat_id=chat_id, animation=open(video_path, 'rb'))
         bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown', reply_markup=reply_markup)
 
 # ---------------- MAIN LOGIC ---------------- #
