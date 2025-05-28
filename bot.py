@@ -98,93 +98,96 @@ def check_blocks():
 
     for block_number in range(last_checked + 1, latest + 1):
         block = w3.eth.get_block(block_number, full_transactions=True)
+        for tx in block.transactions:
+            if tx['to'] is None and tx['from'] is None:
+                continue
 
-    for tx in block.transactions:
-        if tx['to'] is None and tx['from'] is None:
-            continue
+            to_address = w3.to_checksum_address(tx['to']) if tx['to'] else None
+            from_address = w3.to_checksum_address(tx['from']) if tx['from'] else None
 
-        to_address = w3.to_checksum_address(tx['to']) if tx['to'] else None
-        from_address = w3.to_checksum_address(tx['from']) if tx['from'] else None
-
-        if to_address not in WALLETS_TO_TRACK and from_address not in WALLETS_TO_TRACK:
-            continue
-        try:
-            from_addr = tx['from']
-            to_addr = tx['to']
-            value = tx['value']
-            if from_addr in WALLETS_TO_TRACK or to_addr in WALLETS_TO_TRACK:
-                tx_type = "incoming" if to_addr in WALLETS_TO_TRACK else "outgoing"
-                tracked_addr = to_addr if tx_type == "incoming" else from_addr
-                value_eth = w3.from_wei(value, 'ether')
-                message = build_frictionless_message(tx_type, 'ETH', value_eth, tx.hash.hex(), tracked_addr)
-                if message:
-                            print(f"Sending message: {message[:100]}...", flush=True)
-                            notify(message, tx_type)
-
+            if to_address not in WALLETS_TO_TRACK and from_address not in WALLETS_TO_TRACK:
+                continue
             try:
-                receipt = w3.eth.get_transaction_receipt(tx.hash)
+                from_addr = tx['from']
+                to_addr = tx['to']
+                value = tx['value']
+                if from_addr in WALLETS_TO_TRACK or to_addr in WALLETS_TO_TRACK:
+                    tx_type = "incoming" if to_addr in WALLETS_TO_TRACK else "outgoing"
+                    tracked_addr = to_addr if tx_type == "incoming" else from_addr
+                    value_eth = w3.from_wei(value, 'ether')
+                    message = build_frictionless_message(tx_type, 'ETH', value_eth, tx.hash.hex(), tracked_addr)
+                    if message:
+                        print(f"Sending message: {message[:100]}...", flush=True)
+                        notify(message, tx_type)
+
+                try:
+                    receipt = w3.eth.get_transaction_receipt(tx.hash)
+                except Exception as e:
+                    if '429' in str(e):
+                        print("Rate limited by RPC provider. Cooling down for 120 seconds.", flush=True)
+                        time.sleep(120)
+                        continue
+                    else:
+                        raise
+
+                for log in receipt.logs:
+                    if len(log['topics']) != 3:
+                        continue
+                    if log['topics'][0].hex() == transfer_event_sig:
+                        try:
+                            contract = w3.eth.contract(address=log['address'], abi=ERC20_ABI)
+                            from web3._utils.events import get_event_data
+                            transfer_event_abi = [abi for abi in ERC20_ABI if abi.get("type") == "event" and abi.get("name") == "Transfer"][0]
+                            decoded_log = get_event_data(w3.codec, transfer_event_abi, log)
+
+                            from_addr = decoded_log['args']['from']
+                            to_addr = decoded_log['args']['to']
+                            value = decoded_log['args']['value']
+
+                            if to_addr in WALLETS_TO_TRACK:
+                                tx_type = "incoming"
+                                tracked_addr = to_addr
+                            elif from_addr in WALLETS_TO_TRACK:
+                                tx_type = "outgoing"
+                                tracked_addr = from_addr
+                            else:
+                                continue
+
+                            try:
+                                token_symbol = contract.functions.symbol().call()
+                            except:
+                                token_symbol = "UNKNOWN"
+
+                            try:
+                                decimals = contract.functions.decimals().call()
+                            except:
+                                decimals = 18
+
+                            value_human = value / (10 ** decimals)
+                            if value == 0:
+                                continue
+                            unique_id = f"{tx.hash.hex()}-{tracked_addr}"
+                            if unique_id in seen_messages:
+                                continue
+                            seen_messages.add(unique_id)
+                            message = build_frictionless_message(tx_type, token_symbol, value_human, tx.hash.hex(), tracked_addr)
+                            if message:
+                                print(f"Sending ERC20 message: {message[:100]}...", flush=True)
+                                notify(message, tx_type)
+                        except Exception as e:
+                            print("Decode error:", e)
             except Exception as e:
-                if '429' in str(e):
-                    print("Rate limited by RPC provider. Cooling down for 120 seconds.", flush=True)
-                    time.sleep(120)
-                    continue
-                else:
-                    raise
-            for log in receipt.logs:
-                if len(log['topics']) != 3:
-                    continue  # Skip non-ERC20 Transfer events
-                if log['topics'][0].hex() == transfer_event_sig:
-                    try:
-                        contract = w3.eth.contract(address=log['address'], abi=ERC20_ABI)
-                        from web3._utils.events import get_event_data
-                        transfer_event_abi = [abi for abi in ERC20_ABI if abi.get("type") == "event" and abi.get("name") == "Transfer"][0]
-                        decoded_log = get_event_data(w3.codec, transfer_event_abi, log)
-
-                        from_addr = decoded_log['args']['from']
-                        to_addr = decoded_log['args']['to']
-                        value = decoded_log['args']['value']
-
-                        if to_addr in WALLETS_TO_TRACK:
-                            tx_type = "incoming"
-                            tracked_addr = to_addr
-                        elif from_addr in WALLETS_TO_TRACK:
-                            tx_type = "outgoing"
-                            tracked_addr = from_addr
-                        else:
-                            continue
-
-                        try:
-                            token_symbol = contract.functions.symbol().call()
-                        except:
-                            token_symbol = "UNKNOWN"
-
-                        try:
-                            decimals = contract.functions.decimals().call()
-                        except:
-                            decimals = 18
-
-                        value_human = value / (10 ** decimals)
-                        if value == 0:
-                            continue  # Skip zero-value transfers
-                        unique_id = f"{tx.hash.hex()}-{tracked_addr}"
-                        if unique_id in seen_messages:
-                            continue  # Skip duplicates
-                        seen_messages.add(unique_id)
-                        message = build_frictionless_message(tx_type, token_symbol, value_human, tx.hash.hex(), tracked_addr)
-                        if message:
-                            print(f"Sending ERC20 message: {message[:100]}...", flush=True)
-                            notify(message, tx_type)
-                    except Exception as e:
-                        print("Decode error:", e)
-        except Exception as e:
-            print("Receipt error:", e)
+                print("Receipt error:", e)
 
 # ---------------- RUN LOOP ---------------- #
 if __name__ == '__main__':
     while True:
         try:
             check_blocks()
+            last_checked = w3.eth.block_number
             time.sleep(60)
         except Exception as e:
             print("Main loop error:", e)
             time.sleep(30)
+
+
