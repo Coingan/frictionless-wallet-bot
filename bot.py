@@ -46,6 +46,8 @@ ERC20_ABI = json.loads('''
 ]''')
 
 # ---------------- SETUP ---------------- #
+last_checked = Web3(Web3.HTTPProvider(ETHEREUM_RPC_URL)).eth.block_number
+
 w3 = Web3(Web3.HTTPProvider(ETHEREUM_RPC_URL))
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 transfer_event_sig = w3.keccak(text="Transfer(address,address,uint256)").hex()
@@ -88,14 +90,15 @@ def notify(message, tx_type=None):
         bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown', reply_markup=reply_markup)
 
 # ---------------- MAIN LOGIC ---------------- #
-last_checked = w3.eth.block_number - 1
+ - 1
 
 def check_blocks():
     global last_checked
     latest = w3.eth.block_number
     print(f"Checking blocks {last_checked + 1} to {latest}", flush=True)
     seen_messages = set()  # to prevent duplicates
-
+    # ✅ Update after processing all blocks
+    last_checked = latest
     for block_number in range(last_checked + 1, latest + 1):
         block = w3.eth.get_block(block_number, full_transactions=True)
         for tx in block.transactions:
@@ -164,7 +167,7 @@ def check_blocks():
                                 decimals = 18
 
                             value_human = value / (10 ** decimals)
-                            if value == 0:
+                            if value_human == 0:
                                 continue
                             unique_id = f"{tx.hash.hex()}-{tracked_addr}"
                             if unique_id in seen_messages:
@@ -184,10 +187,10 @@ if __name__ == '__main__':
     while True:
         try:
             check_blocks()
-            last_checked = w3.eth.block_number
             time.sleep(60)
         except Exception as e:
             print("Main loop error:", e)
             time.sleep(30)
+
 
 
