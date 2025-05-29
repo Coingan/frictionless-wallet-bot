@@ -90,7 +90,6 @@ def notify(message, tx_type=None):
         bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown', reply_markup=reply_markup)
 
 # ---------------- MAIN LOGIC ---------------- #
- - 1
 
 def check_blocks():
     global last_checked
@@ -191,6 +190,7 @@ if __name__ == '__main__':
         except Exception as e:
             print("Main loop error:", e)
             time.sleep(30)
+
 
 
 
