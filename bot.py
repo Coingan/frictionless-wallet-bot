@@ -46,8 +46,7 @@ ERC20_ABI = json.loads('''
 ]''')
 
 # ---------------- SETUP ---------------- #
-last_checked = Web3(Web3.HTTPProvider(ETHEREUM_RPC_URL)).eth.block_number
-
+last_checked = w3.eth.block_number
 w3 = Web3(Web3.HTTPProvider(ETHEREUM_RPC_URL))
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 transfer_event_sig = w3.keccak(text="Transfer(address,address,uint256)").hex()
@@ -76,10 +75,10 @@ def build_frictionless_message(tx_type, token_symbol, value, tx_hash, address):
 def notify(message, tx_type=None):
     video_path = 'Friccy_whale.gif'
     if tx_type == "incoming":
-        keyboard = [[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/contribute")]]
+        keyboard = [[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
     elif tx_type == "outgoing":
-        keyboard = [[InlineKeyboardButton("💰 Create an OTC offer", url="https://app.frictionless.network/create")]]
+        keyboard = [[InlineKeyboardButton("💰 Create an OTC offer", url="https://app.frictionless.network/")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
     else:
         keyboard = []
@@ -90,14 +89,12 @@ def notify(message, tx_type=None):
         bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown', reply_markup=reply_markup)
 
 # ---------------- MAIN LOGIC ---------------- #
-
 def check_blocks():
     global last_checked
     latest = w3.eth.block_number
     print(f"Checking blocks {last_checked + 1} to {latest}", flush=True)
-    seen_messages = set()  # to prevent duplicates
-    # ✅ Update after processing all blocks
-    last_checked = latest
+    seen_messages = set()
+
     for block_number in range(last_checked + 1, latest + 1):
         block = w3.eth.get_block(block_number, full_transactions=True)
         for tx in block.transactions:
@@ -131,10 +128,9 @@ def check_blocks():
                         continue
                     else:
                         raise
-
                 for log in receipt.logs:
                     if len(log['topics']) != 3:
-                        continue
+                        continue  # Skip non-ERC20 Transfer events
                     if log['topics'][0].hex() == transfer_event_sig:
                         try:
                             contract = w3.eth.contract(address=log['address'], abi=ERC20_ABI)
@@ -168,10 +164,6 @@ def check_blocks():
                             value_human = value / (10 ** decimals)
                             if value_human == 0:
                                 continue
-                            unique_id = f"{tx.hash.hex()}-{tracked_addr}"
-                            if unique_id in seen_messages:
-                                continue
-                            seen_messages.add(unique_id)
                             message = build_frictionless_message(tx_type, token_symbol, value_human, tx.hash.hex(), tracked_addr)
                             if message:
                                 print(f"Sending ERC20 message: {message[:100]}...", flush=True)
@@ -180,6 +172,8 @@ def check_blocks():
                             print("Decode error:", e)
             except Exception as e:
                 print("Receipt error:", e)
+
+    last_checked = latest
 
 # ---------------- RUN LOOP ---------------- #
 if __name__ == '__main__':
@@ -190,7 +184,4 @@ if __name__ == '__main__':
         except Exception as e:
             print("Main loop error:", e)
             time.sleep(30)
-
-
-
 
