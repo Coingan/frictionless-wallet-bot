@@ -46,8 +46,8 @@ ERC20_ABI = json.loads('''
 ]''')
 
 # ---------------- SETUP ---------------- #
-last_checked = w3.eth.block_number
 w3 = Web3(Web3.HTTPProvider(ETHEREUM_RPC_URL))
+last_checked = w3.eth.block_number
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 transfer_event_sig = w3.keccak(text="Transfer(address,address,uint256)").hex()
 
