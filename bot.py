@@ -111,61 +111,7 @@ def check_blocks():
                 to_addr = tx['to']
                 value = tx['value']
                 if from_addr in WALLETS_TO_TRACK or to_addr in WALLETS_TO_TRACK:
-                    try:
-                        receipt = w3.eth.get_transaction_receipt(tx.hash)
-                    except Exception as e:
-                        if '429' in str(e):
-                            print("Rate limited by RPC provider. Cooling down for 120 seconds.", flush=True)
-                            time.sleep(120)
-                            continue
-                        else:
-                            raise
-
-                    found_token_log = False
-                    for log in receipt.logs:
-                        if len(log['topics']) != 3:
-                            continue  # Skip non-ERC20 Transfer events
-                        if log['topics'][0].hex() == transfer_event_sig:
-                            try:
-                                contract = w3.eth.contract(address=log['address'], abi=ERC20_ABI)
-                                from web3._utils.events import get_event_data
-                                transfer_event_abi = [abi for abi in ERC20_ABI if abi.get("type") == "event" and abi.get("name") == "Transfer"][0]
-                                decoded_log = get_event_data(w3.codec, transfer_event_abi, log)
-
-                                from_addr = decoded_log['args']['from']
-                                to_addr = decoded_log['args']['to']
-                                value = decoded_log['args']['value']
-
-                                if to_addr in WALLETS_TO_TRACK:
-                                    tx_type = "incoming"
-                                    tracked_addr = to_addr
-                                elif from_addr in WALLETS_TO_TRACK:
-                                    tx_type = "outgoing"
-                                    tracked_addr = from_addr
-                                else:
-                                    continue
-
-                                try:
-                                    token_symbol = contract.functions.symbol().call()
-                                except:
-                                    token_symbol = "UNKNOWN"
-
-                                try:
-                                    decimals = contract.functions.decimals().call()
-                                except:
-                                    decimals = 18
-
-                                value_human = value / (10 ** decimals)
-                                if value_human == 0:
-                                    continue
-
-                                message = build_frictionless_message(tx_type, token_symbol, value_human, tx.hash.hex(), tracked_addr)
-                                if message:
-                                    print(f"Sending ERC20 message: {message[:100]}...", flush=True)
-                                    notify(message, tx_type)
-                                    found_token_log = True
-                            except Exception as e:
-                                print("Decode error:", e)
+                    
                     if not found_token_log:
                         if value == 0:
                             continue  # Skip zero-value ETH transfers
