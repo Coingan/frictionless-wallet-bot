@@ -111,6 +111,8 @@ def check_blocks():
                 to_addr = tx['to']
                 value = tx['value']
                 if from_addr in WALLETS_TO_TRACK or to_addr in WALLETS_TO_TRACK:
+                    if value == 0:
+                        continue  # Skip zero-value ETH transfers
                     tx_type = "incoming" if to_addr in WALLETS_TO_TRACK else "outgoing"
                     tracked_addr = to_addr if tx_type == "incoming" else from_addr
                     value_eth = w3.from_wei(value, 'ether')
@@ -184,4 +186,3 @@ if __name__ == '__main__':
         except Exception as e:
             print("Main loop error:", e)
             time.sleep(30)
-
