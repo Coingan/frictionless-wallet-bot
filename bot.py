@@ -46,6 +46,9 @@ ERC20_ABI = json.loads('''
 ]''')
 
 # ---------------- SETUP ---------------- #
+start_time = time.time()
+latest_tx_hash = None
+from telegram.ext import Updater, CommandHandler
 w3 = Web3(Web3.HTTPProvider(ETHEREUM_RPC_URL))
 last_checked = w3.eth.block_number
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
@@ -157,6 +160,8 @@ def check_blocks():
 
                             message = build_frictionless_message(tx_type, token_symbol, value_human, tx.hash.hex(), tracked_addr)
                             if message:
+                                global latest_tx_hash
+                                latest_tx_hash = tx.hash.hex()
                                 print(f"Sending ERC20 message: {message[:100]}...", flush=True)
                                 notify(message, tx_type)
                                 found_token_log = True
@@ -178,6 +183,8 @@ def check_blocks():
                         value_eth = w3.from_wei(value, 'ether')
                         message = build_frictionless_message(tx_type, 'ETH', value_eth, tx.hash.hex(), tracked_addr)
                         if message:
+                            global latest_tx_hash
+                            latest_tx_hash = tx.hash.hex()
                             print(f"Sending message: {message[:100]}...", flush=True)
                             notify(message, tx_type)
 
@@ -190,12 +197,81 @@ def check_blocks():
 
     last_checked = latest
 
-# ---------------- RUN LOOP ---------------- #
+# ---------------- TELEGRAM COMMANDS ---------------- #
+
+def start_command(update, context):
+    update.message.reply_text("🚀 Frictionless bot is live and tracking blocks.")
+
+def status_command(update, context):
+    block = w3.eth.block_number
+    update.message.reply_text(f"📡 Bot is synced. Current block: {block}")
+
+def switches_command(update, context):
+    switches = ''.join([f"{label}: `{addr}`" for addr, label in WALLETS_TO_TRACK.items()])
+    update.message.reply_text(f"🔀 *Tracked Switches:*{switches}", parse_mode='Markdown')
+
+def uptime_command(update, context):
+    uptime_seconds = int(time.time() - start_time)
+    hours, remainder = divmod(uptime_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    update.message.reply_text(f"⏱ Bot uptime: {hours}h {minutes}m {seconds}s")
+
+def latest_tx_command(update, context):
+    if latest_tx_hash:
+        update.message.reply_text(f"🔗 Latest transaction seen:https://etherscan.io/tx/{latest_tx_hash}")
+    else:
+        update.message.reply_text("No transactions seen yet.")
+
+def commands_command(update, context):
+    command_list = (
+        "/status - Show current block height"
+        "/switches - List all tracked wallets"
+        "/uptime - Show how long the bot has been running"
+        "/latest_tx - Show last transaction seen"
+        "/commands - List all commands"
+        "/help - Gitbook link"
+    )
+    update.message.reply_text(command_list)
+
+def help_command(update, context):
+    help_text = (
+        "📚 *Bot Help*"
+        "Full documentation: https://frictionless-2.gitbook.io/http-www.frictionless.help"
+    )
+    update.message.reply_text(help_text, parse_mode='Markdown')
+
+updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
+dp = updater.dispatcher
+
+dp.add_handler(CommandHandler("uptime", uptime_command))
+dp.add_handler(CommandHandler("latest_tx", latest_tx_command))
+dp.add_handler(CommandHandler("commands", commands_command))
+dp.add_handler(CommandHandler("start", start_command))
+dp.add_handler(CommandHandler("status", status_command))
+dp.add_handler(CommandHandler("switches", switches_command))
+dp.add_handler(CommandHandler("help", help_command))
+
 if __name__ == '__main__':
-    while True:
-        try:
+    import threading
+
+    def run_scanner():
+        while True:
+            try:
+                check_blocks()
+                time.sleep(60)
+            except Exception as e:
+                print("Main loop error:", e)
+                time.sleep(30)
+
+    scanner_thread = threading.Thread(target=run_scanner)
+    scanner_thread.start()
+
+    # Start Telegram command listener
+    updater.start_polling()
+    updater.idle()
+    try:
             check_blocks()
             time.sleep(60)
-        except Exception as e:
+    except Exception as e:
             print("Main loop error:", e)
             time.sleep(30)
