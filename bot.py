@@ -126,11 +126,11 @@ def check_blocks():
                             value = decoded_log['args']['value']
 
                             if to_addr in WALLETS_TO_TRACK:
-                            tx_type = "incoming"
-                            tracked_addr = to_addr
-                        elif from_addr in WALLETS_TO_TRACK:
-                            if to_addr.lower() == "0x4ca9798a36b287f6675429884fab36563f82552d".lower():
-                                continue  # omit this specific outgoing address
+                                tx_type = "incoming"
+                                tracked_addr = to_addr
+                            elif from_addr in WALLETS_TO_TRACK:
+                                if to_addr.lower() == "0x4ca9798a36b287f6675429884fab36563f82552d".lower():
+                                    continue  # omit this specific outgoing address
 
                                 tx_type = "outgoing"
                                 tracked_addr = from_addr
@@ -195,4 +195,5 @@ if __name__ == '__main__':
         except Exception as e:
             print("Main loop error:", e)
             time.sleep(30)
+
 
