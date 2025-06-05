@@ -202,8 +202,8 @@ def status_command(update, context):
     update.message.reply_text(f"📡 Bot is synced. Current block: {block}")
 
 def switches_command(update, context):
-    switches = '\n'.join([f"{label}: `{addr}`" for addr, label in WALLETS_TO_TRACK.items()])
-    update.message.reply_text(f"🔀 *Tracked Switches:\n*{switches}", parse_mode='Markdown')
+    switches = ''.join([f"{label}: `{addr}`" for addr, label in WALLETS_TO_TRACK.items()])
+    update.message.reply_text(f"🔀 *Tracked Switches:*{switches}", parse_mode='Markdown')
 
 def uptime_command(update, context):
     uptime_seconds = int(time.time() - start_time)
@@ -225,7 +225,7 @@ def commands_command(update, context):
 
 def help_command(update, context):
     help_text = (
-        "https://frictionless-2.gitbook.io/http-www.frictionless.help"
+        "/help - https://frictionless-2.gitbook.io/http-www.frictionless.help"
     )
     update.message.reply_text(help_text)
 
@@ -254,7 +254,7 @@ if __name__ == '__main__':
     scanner_thread.start()
 
     # Start Telegram command listener
-    updater.start_polling(drop_pending_updates=True)
+    updater.start_polling()
     updater.idle()
   
 
