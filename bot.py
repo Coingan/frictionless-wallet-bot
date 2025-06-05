@@ -213,20 +213,18 @@ def uptime_command(update, context):
 
 def commands_command(update, context):
     commands_text = (
-        "*Available Commands:*"
-        "`/start` - Show startup confirmation"
-        "`/status` - Show current block height"
-        "`/switches` - List all tracked wallets"
-        "`/uptime` - Show how long the bot has been running"
-        "`/help` - Link to Frictional Platform User Guide"
+        "*Available Commands:*\n\n"
+        "`/start` - Show startup confirmation\n"
+        "`/status` - Show current block height\n"
+        "`/switches` - List all tracked switches\n"
+        "`/uptime` - Show how long the bot has been running\n"
+        "`/help` - Link to Frictional Platform User Guide\n"
         "`/commands` - List all available commands"
     )
     update.message.reply_text(commands_text, parse_mode='Markdown')
 
 def help_command(update, context):
     help_text = (
-        "/status - Show current block height"
-        "/switches - List all tracked wallets"
         "/help - https://frictionless-2.gitbook.io/http-www.frictionless.help"
     )
     update.message.reply_text(help_text)
@@ -258,9 +256,4 @@ if __name__ == '__main__':
     # Start Telegram command listener
     updater.start_polling()
     updater.idle()
-    try:
-            check_blocks()
-            time.sleep(60)
-    except Exception as e:
-            print("Main loop error:", e)
-            time.sleep(30)
+  
