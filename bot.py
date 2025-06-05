@@ -254,7 +254,7 @@ if __name__ == '__main__':
     scanner_thread.start()
 
     # Start Telegram command listener
-    updater.start_polling()
+    updater.start_polling(drop_pending_updates=True)
     updater.idle()
   
 
