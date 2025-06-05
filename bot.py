@@ -213,15 +213,15 @@ def uptime_command(update, context):
 
 def commands_command(update, context):
     commands_text = (
-        "*Available Commands:*\n\n"
-        "'/start' - Show startup confirmation\n"
-        "'/status' - Show current block height\n"
-        "'/switches' - List all tracked wallets\n"
-        "'/uptime' - Show how long the bot has been running\n"
-        "'/help' - Link to Frictional Platform User Guide\n"
-        "'/commands' - List all available commands"
+        "*Available Commands:*"
+        "`/start` - Show startup confirmation"
+        "`/status` - Show current block height"
+        "`/switches` - List all tracked wallets"
+        "`/uptime` - Show how long the bot has been running"
+        "`/help` - Link to Frictional Platform User Guide"
+        "`/commands` - List all available commands"
     )
-    update.message.reply_text(commands_text)
+    update.message.reply_text(commands_text, parse_mode='Markdown')
 
 def help_command(update, context):
     help_text = (
