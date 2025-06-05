@@ -11,11 +11,11 @@ TELEGRAM_CHAT_IDS = os.getenv('TELEGRAM_CHAT_ID', '').split(',')
 ETHEREUM_RPC_URL = os.getenv('ETHEREUM_RPC_URL')
 
 WALLETS_TO_TRACK = {
-    '0xd9aD5Acc883D8a67ab612B70C11abF33dD450A45': 'Switch FRIC/ETH',
-    '0xda1916b0d6B209A143009214Cac95e771c4aa277': 'Switch FRIC/ETH'
+    '0xd9aD5Acc883D8a67ab612B70C11abF33dD450A45': 'FRIC/ETH',
+    '0xda1916b0d6B209A143009214Cac95e771c4aa277': 'FRIC/ETH'
 }
 
-GLOBAL_LABEL = "Frictionless Whales POTC"
+GLOBAL_LABEL = "Frictionless Whales"
 
 ERC20_ABI = json.loads('''
 [
@@ -58,16 +58,20 @@ def build_frictionless_message(tx_type, token_symbol, value, tx_hash, address):
         return None
     if tx_type == "incoming":
         return (
-            f"🔔 *New Offer Created on the Frictionless Platform* ({wallet_label}, {GLOBAL_LABEL})\n"
-            f"Token: `{token_symbol}`\n"
+            f"🔔 *New Offer Created on the Frictionless Platform*\n\n"
+            f"Token Offered: `{token_symbol}`\n"
             f"Amount: `{value:.4f}`\n"
+            f"Switch: _{wallet_label}_\n"
+            f"Channel: _{GLOBAL_LABEL}_\n"
             f"🔗 [View Transaction](https://etherscan.io/tx/{tx_hash})"
         )
     elif tx_type == "outgoing":
         return (
-            f"🤝 *Contribution on offer wall* ({wallet_label}, {GLOBAL_LABEL})\n"
-            f"Token: `{token_symbol}`\n"
+            f"🤝 *Contribution on Offer Wall*\n\n"
+            f"Token Received: `{token_symbol}`\n"
             f"Amount: `{value:.4f}`\n"
+            f"Switch: _{wallet_label}_\n"
+            f"Channel: _{GLOBAL_LABEL}_\n"
             f"🔗 [View Transaction](https://etherscan.io/tx/{tx_hash})"
         )
     return None
@@ -75,10 +79,10 @@ def build_frictionless_message(tx_type, token_symbol, value, tx_hash, address):
 def notify(message, tx_type=None):
     video_path = 'Friccy_whale.gif'
     if tx_type == "incoming":
-        keyboard = [[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/")]]
+        keyboard = [[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/contribute")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
     elif tx_type == "outgoing":
-        keyboard = [[InlineKeyboardButton("💰 Create an OTC offer", url="https://app.frictionless.network/")]]
+        keyboard = [[InlineKeyboardButton("💰 Create an OTC offer", url="https://app.frictionless.network/create")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
     else:
         keyboard = []
@@ -195,5 +199,3 @@ if __name__ == '__main__':
         except Exception as e:
             print("Main loop error:", e)
             time.sleep(30)
-
-
