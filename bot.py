@@ -225,7 +225,7 @@ def commands_command(update, context):
 
 def help_command(update, context):
     help_text = (
-        "https://frictionless-2.gitbook.io/http-www.frictionless.help"
+        "/help - https://frictionless-2.gitbook.io/http-www.frictionless.help"
     )
     update.message.reply_text(help_text)
 
