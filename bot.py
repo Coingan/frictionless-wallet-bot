@@ -46,7 +46,9 @@ ERC20_ABI = json.loads('''
 ]''')
 
 # ---------------- SETUP ---------------- #
-from telegram.ext import Updater, CommandHandler
+from flask import Flask, request
+from telegram import Update
+from telegram.ext import Dispatcher, CommandHandler, CallbackContext
 w3 = Web3(Web3.HTTPProvider(ETHEREUM_RPC_URL))
 last_checked = w3.eth.block_number
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
@@ -192,6 +194,15 @@ def check_blocks():
     last_checked = latest
 
 # ---------------- TELEGRAM COMMANDS ---------------- #
+from telegram.ext import Dispatcher, CallbackContext
+from telegram import Update
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    if request.method == "POST":
+        update = Update.de_json(request.get_json(force=True), bot)
+        dispatcher.process_update(update)
+    return "ok"
 start_time = time.time()
 
 def start_command(update, context):
@@ -218,7 +229,7 @@ def commands_command(update, context):
         "`/status` - Show current block height\n"
         "`/switches` - List all tracked switches\n"
         "`/uptime` - Show how long the bot has been running\n"
-        "`/help` - Link to Frictional Platform User Guide\n"
+        "`/help` - Link to Frictionless Platform User Guide\n"
         "`/commands` - List all available commands"
     )
     update.message.reply_text(commands_text, parse_mode='Markdown')
@@ -229,14 +240,15 @@ def help_command(update, context):
     )
     update.message.reply_text(help_text)
 
-updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
-dp = updater.dispatcher
-dp.add_handler(CommandHandler("uptime", uptime_command))
-dp.add_handler(CommandHandler("start", start_command))
-dp.add_handler(CommandHandler("status", status_command))
-dp.add_handler(CommandHandler("switches", switches_command))
-dp.add_handler(CommandHandler("help", help_command))
-dp.add_handler(CommandHandler("commands", commands_command))
+app = Flask(__name__)
+dispatcher = Dispatcher(bot, None, workers=0)
+
+dispatcher.add_handler(CommandHandler("uptime", uptime_command))
+dispatcher.add_handler(CommandHandler("start", start_command))
+dispatcher.add_handler(CommandHandler("status", status_command))
+dispatcher.add_handler(CommandHandler("switches", switches_command))
+dispatcher.add_handler(CommandHandler("help", help_command))
+dispatcher.add_handler(CommandHandler("commands", commands_command))
 
 if __name__ == '__main__':
     import threading
@@ -253,6 +265,6 @@ if __name__ == '__main__':
     scanner_thread = threading.Thread(target=run_scanner)
     scanner_thread.start()
 
-    # Start Telegram command listener
-    updater.start_polling(drop_pending_updates=True)
-    updater.idle()
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+  
+
