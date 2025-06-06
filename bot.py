@@ -197,6 +197,8 @@ def check_blocks():
 from telegram.ext import Dispatcher, CallbackContext
 from telegram import Update
 
+app = Flask(__name__)
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
     if request.method == "POST":
@@ -213,7 +215,7 @@ def status_command(update, context):
     update.message.reply_text(f"📡 Bot is synced. Current block: {block}")
 
 def switches_command(update, context):
-    switches = ''.join([f"{label}: `{addr}`" for addr, label in WALLETS_TO_TRACK.items()])
+    switches = '\n'.join([f"{label}: `{addr}`" for addr, label in WALLETS_TO_TRACK.items()])
     update.message.reply_text(f"🔀 *Tracked Switches:*{switches}", parse_mode='Markdown')
 
 def uptime_command(update, context):
@@ -240,7 +242,6 @@ def help_command(update, context):
     )
     update.message.reply_text(help_text)
 
-app = Flask(__name__)
 dispatcher = Dispatcher(bot, None, workers=0)
 
 dispatcher.add_handler(CommandHandler("uptime", uptime_command))
