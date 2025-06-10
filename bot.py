@@ -99,6 +99,7 @@ def notify(message, tx_type=None):
 def check_blocks():
     global last_checked
     latest = w3.eth.block_number
+    print(f"🧪 Latest block: {latest}", flush=True)
     print(f"Checking blocks {last_checked + 1} to {latest}", flush=True)
     seen_messages = set()
 
@@ -259,12 +260,13 @@ if __name__ == '__main__':
     import threading
 
     def run_scanner():
+        print("✅ Scanner thread started", flush=True)
         while True:
             try:
                 check_blocks()
                 time.sleep(60)
             except Exception as e:
-                print("Main loop error:", e)
+                print(f"🔥 Main loop error: {repr(e)}", flush=True)
                 time.sleep(30)
 
     scanner_thread = threading.Thread(target=run_scanner)
