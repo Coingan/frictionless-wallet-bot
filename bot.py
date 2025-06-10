@@ -270,6 +270,12 @@ if __name__ == '__main__':
     scanner_thread = threading.Thread(target=run_scanner)
     scanner_thread.start()
 
+    # Auto-set webhook on startup
+    webhook_url = os.environ.get('WEBHOOK_URL')
+    if webhook_url:
+        bot.set_webhook(url=f"{webhook_url}/webhook")
+        print(f"Webhook set to {webhook_url}/webhook")
+
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
   
 
