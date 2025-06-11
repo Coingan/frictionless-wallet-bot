@@ -4,6 +4,10 @@ from web3 import Web3
 from telegram import Bot
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import os
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
+logger = logging.getLogger(__name__)
 
 # ---------------- CONFIG ---------------- #
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
@@ -99,8 +103,8 @@ def notify(message, tx_type=None):
 def check_blocks():
     global last_checked
     latest = w3.eth.block_number
-    print(f"🧪 Latest block: {latest}", flush=True)
-    print(f"Checking blocks {last_checked + 1} to {latest}", flush=True)
+    logger.info(f"🧪 Latest block: {latest}")
+    logger.info(f"Checking blocks {last_checked + 1} to {latest}")
     seen_messages = set()
 
     for block_number in range(last_checked + 1, latest + 1):
@@ -161,11 +165,11 @@ def check_blocks():
 
                             message = build_frictionless_message(tx_type, token_symbol, value_human, tx.hash.hex(), tracked_addr)
                             if message:
-                                print(f"Sending ERC20 message: {message[:100]}...", flush=True)
+                                logger.info(f"Sending ERC20 message: {message[:100]}...")
                                 notify(message, tx_type)
                                 found_token_log = True
                         except Exception as e:
-                            print("Decode error:", e)
+                            logger.warning(f"Decode error: {e}")
 
                 if not found_token_log:
                     from_addr = tx['from']
@@ -182,15 +186,15 @@ def check_blocks():
                         value_eth = w3.from_wei(value, 'ether')
                         message = build_frictionless_message(tx_type, 'ETH', value_eth, tx.hash.hex(), tracked_addr)
                         if message:
-                            print(f"Sending message: {message[:100]}...", flush=True)
+                            logger.info(f"Sending message: {message[:100]}...")
                             notify(message, tx_type)
 
             except Exception as e:
                 if '429' in str(e):
-                    print("Rate limited by RPC provider. Cooling down for 120 seconds.", flush=True)
+                    logger.warning("Rate limited by RPC provider. Cooling down for 120 seconds.")
                     time.sleep(120)
                 else:
-                    print("Receipt error:", e)
+                    logger.error(f"Receipt error: {e}")
 
     last_checked = latest
 
@@ -221,7 +225,7 @@ def status_command(update, context):
 
 def switches_command(update, context):
     switches = '\n'.join([f"{label}: `{addr}`" for addr, label in WALLETS_TO_TRACK.items()])
-    update.message.reply_text(f"🔀 *Tracked Switches:*{switches}", parse_mode='Markdown')
+    update.message.reply_text(f"🔀 *Tracked Switches:*\n{switches}", parse_mode='Markdown')
 
 def uptime_command(update, context):
     uptime_seconds = int(time.time() - start_time)
@@ -234,7 +238,7 @@ def commands_command(update, context):
         "*Available Commands:*\n\n"
         "`/start` - Show startup confirmation\n"
         "`/status` - Show current block height\n"
-        "`/switches` - List all tracked switches\n"
+        "`/switches` - List all contract addresses for tracked switches\n"
         "`/uptime` - Show how long the bot has been running\n"
         "`/help` - Link to Frictionless Platform User Guide\n"
         "`/commands` - List all available commands"
@@ -260,13 +264,13 @@ if __name__ == '__main__':
     import threading
 
     def run_scanner():
-        print("✅ Scanner thread started", flush=True)
+        logger.info("✅ Scanner thread started")
         while True:
             try:
                 check_blocks()
                 time.sleep(60)
             except Exception as e:
-                print(f"🔥 Main loop error: {repr(e)}", flush=True)
+                logger.error(f"🔥 Main loop error: {repr(e)}")
                 time.sleep(30)
 
     scanner_thread = threading.Thread(target=run_scanner)
@@ -276,9 +280,8 @@ if __name__ == '__main__':
     webhook_url = os.environ.get('WEBHOOK_URL')
     if webhook_url:
         bot.set_webhook(url=f"{webhook_url}/webhook")
-        print(f"Webhook set to {webhook_url}/webhook")
+        logger.info(f"Webhook set to {webhook_url}/webhook")
 
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
   
-
 
