@@ -204,6 +204,26 @@ from telegram import Update
 
 app = Flask(__name__)
 
+# ✅ Launch scanner thread and webhook registration on app load
+def run_scanner():
+    logger.info("✅ Scanner thread started")
+    while True:
+        try:
+            check_blocks()
+            time.sleep(60)
+        except Exception as e:
+            logger.error(f"🔥 Main loop error: {repr(e)}")
+            time.sleep(30)
+
+scanner_thread = threading.Thread(target=run_scanner)
+scanner_thread.daemon = True
+scanner_thread.start()
+
+webhook_url = os.environ.get('WEBHOOK_URL')
+if webhook_url:
+    bot.set_webhook(url=f"{webhook_url}/webhook")
+    logger.info(f"Webhook set to {webhook_url}/webhook")
+
 @app.route('/', methods=['GET'])
 def home():
     return 'Frictionless Wallet Bot is running.'
@@ -260,28 +280,7 @@ dispatcher.add_handler(CommandHandler("switches", switches_command))
 dispatcher.add_handler(CommandHandler("help", help_command))
 dispatcher.add_handler(CommandHandler("commands", commands_command))
 
-if __name__ == '__main__':
-    import threading
 
-    def run_scanner():
-        logger.info("✅ Scanner thread started")
-        while True:
-            try:
-                check_blocks()
-                time.sleep(60)
-            except Exception as e:
-                logger.error(f"🔥 Main loop error: {repr(e)}")
-                time.sleep(30)
-
-    scanner_thread = threading.Thread(target=run_scanner)
-    scanner_thread.start()
-
-    # Auto-set webhook on startup
-    webhook_url = os.environ.get('WEBHOOK_URL')
-    if webhook_url:
-        bot.set_webhook(url=f"{webhook_url}/webhook")
-        logger.info(f"Webhook set to {webhook_url}/webhook")
-
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
   
+
 
