@@ -104,7 +104,7 @@ def notify(message, tx_type=None):
 def check_blocks():
     global last_checked
     latest = w3.eth.block_number
-        logger.info(f"Checking blocks {last_checked + 1} to {latest}")
+    logger.info(f"Checking blocks {last_checked + 1} to {latest}")
     seen_messages = set()
 
     for block_number in range(last_checked + 1, latest + 1):
@@ -282,6 +282,8 @@ dispatcher.add_handler(CommandHandler("commands", commands_command))
 
 
   
+
+
 
 
 
