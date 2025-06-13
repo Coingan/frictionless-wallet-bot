@@ -7,7 +7,7 @@ import os
 import logging
 import threading
 import requests
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt #added txt file
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
