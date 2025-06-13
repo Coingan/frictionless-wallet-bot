@@ -88,17 +88,18 @@ def notify(message, tx_type=None):
     video_path = 'Friccy_whale.gif'
     if tx_type == "incoming":
         keyboard = [[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/contribute")]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
     elif tx_type == "outgoing":
         keyboard = [[InlineKeyboardButton("💰 Create an OTC offer", url="https://app.frictionless.network/create")]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
     else:
         keyboard = []
-        reply_markup = None
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
     for chat_id in TELEGRAM_CHAT_IDS:
-        bot.send_animation(chat_id=chat_id, animation=open(video_path, 'rb'))
-        bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown', reply_markup=reply_markup)
+        try:
+            bot.send_animation(chat_id=chat_id, animation=open(video_path, 'rb'), timeout=10)
+            bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown', reply_markup=reply_markup, timeout=10)
+        except Exception as e:
+            logger.error(f"❌ Failed to send Telegram message: {e}")
 
 # ---------------- MAIN LOGIC ---------------- #
 def check_blocks():
@@ -283,7 +284,6 @@ dispatcher.add_handler(CommandHandler("commands", commands_command))
 
   
 
-  
 
 
 
