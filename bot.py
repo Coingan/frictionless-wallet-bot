@@ -241,65 +241,36 @@ def send_campaign_summary():
         bal_eth = w3.from_wei(bal_wei, 'ether')
         res = requests.get(
             "https://api.coingecko.com/api/v3/simple/price",
-            params={"ids":"ethereum","vs_currencies":"usd"}, timeout=10
+            params={"ids": "ethereum", "vs_currencies": "usd"}, timeout=10
         ).json()
         price_usd = res.get('ethereum', {}).get('usd', 0)
         current_usd = float(bal_eth) * price_usd
         percent = min(100, (current_usd / CAMPAIGN_TARGET_USD) * 100)
 
-                msg = (
+        # Build textual summary
+        msg = (
+            "*Fundraising Update*
 "
-        "            "*Fundraising Update*
+            f"Balance: `{bal_eth:.4f} ETH`
 "
+            f"USD Value: `${current_usd:,.2f}` of `${CAMPAIGN_TARGET_USD:,.2f}`
 "
-        "            f"Balance: `{bal_eth:.4f} ETH`
+            f"Progress: `{percent:.1f}%`
 "
-"
-        "            f"USD Value: `${current_usd:,.2f}` of `${CAMPAIGN_TARGET_USD:,.2f}`
-"
-"
-        "            f"Progress: `{percent:.1f}%`
-"
-"
-        "        )
+        )
 
-"
-        "        # Generate simple progress bar image
-"
-        "        fig, ax = plt.subplots(figsize=(6, 1))
-"
-        "        ax.barh(0, percent, color='green')
-"
-        "        ax.barh(0, 100 - percent, left=percent, color='lightgray')
-"
-        "        ax.set_xlim(0, 100)
-"
-        "        ax.axis('off')
-"
-        "        img_path = '/tmp/progress.png'
-"
-        "        fig.savefig(img_path, bbox_inches='tight')
-"
-        "        plt.close(fig)
+        # Generate simple progress bar image
+        fig, ax = plt.subplots(figsize=(6, 1))
+        ax.barh(0, percent, color='green')
+        ax.barh(0, 100 - percent, left=percent, color='lightgray')
+        ax.set_xlim(0, 100)
+        ax.axis('off')
+        img_path = '/tmp/progress.png'
+        fig.savefig(img_path, bbox_inches='tight')
+        plt.close(fig)
 
-"
-        "        for chat_id in TELEGRAM_CHAT_IDS:
-"
-        "            try:
-"
-        "                bot.send_photo(chat_id=chat_id, photo=open(img_path, 'rb'), timeout=10)
-"
-        "            except Exception as e:
-"
-        "                logger.error(f"Failed to send campaign image: {e}")
-"
-        "            try:
-"
-        "                bot.send_message(chat_id=chat_id, text=msg, parse_mode='Markdown', timeout=10)
-"
-        "            except Exception as e:
-"
-        "                logger.error(f"Failed to send campaign summary: {e}")
+        # Send to Telegram
+        for chat_id in TELEGRAM_CHAT_IDS:
             try:
                 bot.send_photo(chat_id=chat_id, photo=open(img_path, 'rb'), timeout=10)
             except Exception as e:
@@ -311,12 +282,10 @@ def send_campaign_summary():
     except Exception as e:
         logger.error(f"Error in send_campaign_summary: {e}")
 
-def run_summary():
-    while True:
-        send_campaign_summary()
-        time.sleep(840)
-
+# ---------------- START SUMMARY THREAD ----------------
 summary_thread = threading.Thread(target=run_summary)
+summary_thread.daemon = True
+summary_thread.start()(target=run_summary)
 summary_thread.daemon = True
 summary_thread.start()
 
@@ -375,6 +344,10 @@ dispatcher.add_handler(CommandHandler("status", status_command))
 dispatcher.add_handler(CommandHandler("switches", switches_command))
 dispatcher.add_handler(CommandHandler("help", help_command))
 dispatcher.add_handler(CommandHandler("commands", commands_command))
+
+
+  
+
 
 
   
