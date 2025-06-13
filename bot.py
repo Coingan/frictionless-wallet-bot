@@ -6,11 +6,15 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import os
 import logging
 import threading
+import requests
+import matplotlib.pyplot as plt
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
 
 # ---------------- CONFIG ---------------- #
+CAMPAIGN_ADDRESS = os.getenv('CAMPAIGN_ADDRESS')
+CAMPAIGN_TARGET_USD = float(os.getenv('CAMPAIGN_TARGET_USD', '50000'))
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_IDS = os.getenv('TELEGRAM_CHAT_ID', '').split(',')
 ETHEREUM_RPC_URL = os.getenv('ETHEREUM_RPC_URL')
@@ -230,6 +234,60 @@ if webhook_url:
     bot.set_webhook(url=f"{webhook_url}/webhook")
     logger.info(f"Webhook set to {webhook_url}/webhook")
 
+# ---------------- CAMPAIGN SUMMARY THREAD ---------------- #
+def send_campaign_summary():
+    try:
+        bal_wei = w3.eth.get_balance(CAMPAIGN_ADDRESS)
+        bal_eth = w3.from_wei(bal_wei, 'ether')
+        res = requests.get(
+            "https://api.coingecko.com/api/v3/simple/price",
+            params={"ids":"ethereum","vs_currencies":"usd"}, timeout=10
+        ).json()
+        price_usd = res.get('ethereum', {}).get('usd', 0)
+        current_usd = float(bal_eth) * price_usd
+        percent = min(100, (current_usd / CAMPAIGN_TARGET_USD) * 100)
+
+        msg = (
+            f"*Fundraising Update*
+"
+            f"Balance: `{bal_eth:.4f} ETH`
+"
+            f"USD Value: `${current_usd:,.2f}` of `${CAMPAIGN_TARGET_USD:,.2f}`
+"
+            f"Progress: `{percent:.1f}%`
+"
+        )
+        # Generate simple progress bar image
+        fig, ax = plt.subplots(figsize=(6, 1))
+        ax.barh(0, percent, color='green')
+        ax.barh(0, 100 - percent, left=percent, color='lightgray')
+        ax.set_xlim(0, 100)
+        ax.axis('off')
+        img_path = '/tmp/progress.png'
+        fig.savefig(img_path, bbox_inches='tight')
+        plt.close(fig)
+
+        for chat_id in TELEGRAM_CHAT_IDS:
+            try:
+                bot.send_photo(chat_id=chat_id, photo=open(img_path, 'rb'), timeout=10)
+            except Exception as e:
+                logger.error(f"Failed to send campaign image: {e}")
+            try:
+                bot.send_message(chat_id=chat_id, text=msg, parse_mode='Markdown', timeout=10)
+            except Exception as e:
+                logger.error(f"Failed to send campaign summary: {e}")
+    except Exception as e:
+        logger.error(f"Error in send_campaign_summary: {e}")
+
+def run_summary():
+    while True:
+        send_campaign_summary()
+        time.sleep(840)
+
+summary_thread = threading.Thread(target=run_summary)
+summary_thread.daemon = True
+summary_thread.start()
+
 @app.route('/', methods=['GET'])
 def home():
     return 'Frictionless Wallet Bot is running.'
@@ -285,6 +343,9 @@ dispatcher.add_handler(CommandHandler("status", status_command))
 dispatcher.add_handler(CommandHandler("switches", switches_command))
 dispatcher.add_handler(CommandHandler("help", help_command))
 dispatcher.add_handler(CommandHandler("commands", commands_command))
+
+
+  
 
 
   
