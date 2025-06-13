@@ -247,27 +247,59 @@ def send_campaign_summary():
         current_usd = float(bal_eth) * price_usd
         percent = min(100, (current_usd / CAMPAIGN_TARGET_USD) * 100)
 
-        msg = (
-            f"*Fundraising Update*
+                msg = (
 "
-            f"Balance: `{bal_eth:.4f} ETH`
+        "            "*Fundraising Update*
 "
-            f"USD Value: `${current_usd:,.2f}` of `${CAMPAIGN_TARGET_USD:,.2f}`
 "
-            f"Progress: `{percent:.1f}%`
+        "            f"Balance: `{bal_eth:.4f} ETH`
 "
-        )
-        # Generate simple progress bar image
-        fig, ax = plt.subplots(figsize=(6, 1))
-        ax.barh(0, percent, color='green')
-        ax.barh(0, 100 - percent, left=percent, color='lightgray')
-        ax.set_xlim(0, 100)
-        ax.axis('off')
-        img_path = '/tmp/progress.png'
-        fig.savefig(img_path, bbox_inches='tight')
-        plt.close(fig)
+"
+        "            f"USD Value: `${current_usd:,.2f}` of `${CAMPAIGN_TARGET_USD:,.2f}`
+"
+"
+        "            f"Progress: `{percent:.1f}%`
+"
+"
+        "        )
 
-        for chat_id in TELEGRAM_CHAT_IDS:
+"
+        "        # Generate simple progress bar image
+"
+        "        fig, ax = plt.subplots(figsize=(6, 1))
+"
+        "        ax.barh(0, percent, color='green')
+"
+        "        ax.barh(0, 100 - percent, left=percent, color='lightgray')
+"
+        "        ax.set_xlim(0, 100)
+"
+        "        ax.axis('off')
+"
+        "        img_path = '/tmp/progress.png'
+"
+        "        fig.savefig(img_path, bbox_inches='tight')
+"
+        "        plt.close(fig)
+
+"
+        "        for chat_id in TELEGRAM_CHAT_IDS:
+"
+        "            try:
+"
+        "                bot.send_photo(chat_id=chat_id, photo=open(img_path, 'rb'), timeout=10)
+"
+        "            except Exception as e:
+"
+        "                logger.error(f"Failed to send campaign image: {e}")
+"
+        "            try:
+"
+        "                bot.send_message(chat_id=chat_id, text=msg, parse_mode='Markdown', timeout=10)
+"
+        "            except Exception as e:
+"
+        "                logger.error(f"Failed to send campaign summary: {e}")
             try:
                 bot.send_photo(chat_id=chat_id, photo=open(img_path, 'rb'), timeout=10)
             except Exception as e:
@@ -343,6 +375,9 @@ dispatcher.add_handler(CommandHandler("status", status_command))
 dispatcher.add_handler(CommandHandler("switches", switches_command))
 dispatcher.add_handler(CommandHandler("help", help_command))
 dispatcher.add_handler(CommandHandler("commands", commands_command))
+
+
+  
 
 
   
