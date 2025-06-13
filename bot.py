@@ -7,7 +7,7 @@ import os
 import logging
 import threading
 import requests
-import matplotlib.pyplot as plt #added txt file
+import matplotlib.pyplot as plt
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
@@ -279,60 +279,23 @@ def send_campaign_summary():
         logger.error(f"Error in send_campaign_summary: {e}")
 
 # ---------------- START SUMMARY THREAD ----------------
+
+def run_summary():
+    """Background thread to send periodic fundraising summaries"""
+    while True:
+        try:
+            send_campaign_summary()
+        except Exception as e:
+            logger.error(f"Summary thread error: {e}")
+        # wait 14 minutes between summaries
+        time.sleep(1740)
+
 summary_thread = threading.Thread(target=run_summary)
-summary_thread.daemon = True
-summary_thread.start()(target=run_summary)
 summary_thread.daemon = True
 summary_thread.start()
 
-@app.route('/', methods=['GET'])
-def home():
-    return 'Frictionless Wallet Bot is running.'
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    if request.method == "POST":
-        update = Update.de_json(request.get_json(force=True), bot)
-        dispatcher.process_update(update)
-    return "ok"
-start_time = time.time()
-
-def start_command(update, context):
-    update.message.reply_text("🚀 Frictionless bot is live and tracking blocks.")
-
-def status_command(update, context):
-    block = w3.eth.block_number
-    update.message.reply_text(f"📡 Bot is synced. Current block: {block}")
-
-def switches_command(update, context):
-    switches = '\n'.join([f"{label}: `{addr}`" for addr, label in WALLETS_TO_TRACK.items()])
-    update.message.reply_text(f"🔀 *Tracked Switches:*\n{switches}", parse_mode='Markdown')
-
-def uptime_command(update, context):
-    uptime_seconds = int(time.time() - start_time)
-    hours, remainder = divmod(uptime_seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    update.message.reply_text(f"⏱ Bot uptime: {hours}h {minutes}m {seconds}s")
-
-def commands_command(update, context):
-    commands_text = (
-        "*Available Commands:*\n\n"
-        "`/start` - Show startup confirmation\n"
-        "`/status` - Show current block height\n"
-        "`/switches` - List all contract addresses for tracked switches\n"
-        "`/uptime` - Show how long the bot has been running\n"
-        "`/help` - Link to Frictionless Platform User Guide\n"
-        "`/commands` - List all available commands"
-    )
-    update.message.reply_text(commands_text, parse_mode='Markdown')
-
-def help_command(update, context):
-    help_text = (
-        "/help - https://frictionless-2.gitbook.io/http-www.frictionless.help"
-    )
-    update.message.reply_text(help_text)
-
-dispatcher = Dispatcher(bot, None, workers=1, use_context=True)
+# ---------------- TELEGRAM COMMANDS ----------------
+dispatcher = Dispatcher(bot, None, workers=1, use_context=True)(bot, None, workers=1, use_context=True)
 
 dispatcher.add_handler(CommandHandler("uptime", uptime_command))
 dispatcher.add_handler(CommandHandler("start", start_command))
@@ -340,6 +303,9 @@ dispatcher.add_handler(CommandHandler("status", status_command))
 dispatcher.add_handler(CommandHandler("switches", switches_command))
 dispatcher.add_handler(CommandHandler("help", help_command))
 dispatcher.add_handler(CommandHandler("commands", commands_command))
+
+
+  
 
 
   
