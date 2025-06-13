@@ -95,11 +95,16 @@ def notify(message, tx_type=None):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     for chat_id in TELEGRAM_CHAT_IDS:
-        try:
-            bot.send_animation(chat_id=chat_id, animation=open(video_path, 'rb'), timeout=10)
-            bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown', reply_markup=reply_markup, timeout=10)
-        except Exception as e:
-            logger.error(f"❌ Failed to send Telegram message: {e}")
+        for attempt in range(3):
+            try:
+                bot.send_animation(chat_id=chat_id, animation=open(video_path, 'rb'), timeout=10)
+                bot.send_message(chat_id=chat_id, text=message, parse_mode='Markdown', reply_markup=reply_markup, timeout=10)
+                break  # success
+            except Exception as e:
+                logger.warning(f"Attempt {attempt + 1} failed to send Telegram message: {e}")
+                time.sleep(2)
+        else:
+            logger.error(f"❌ All retries failed for message to chat_id {chat_id}")
 
 # ---------------- MAIN LOGIC ---------------- #
 def check_blocks():
