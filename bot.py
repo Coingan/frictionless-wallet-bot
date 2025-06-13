@@ -249,14 +249,10 @@ def send_campaign_summary():
 
         # Build textual summary
         msg = (
-            "*Fundraising Update*
-"
-            f"Balance: `{bal_eth:.4f} ETH`
-"
-            f"USD Value: `${current_usd:,.2f}` of `${CAMPAIGN_TARGET_USD:,.2f}`
-"
-            f"Progress: `{percent:.1f}%`
-"
+            "*Fundraising Update*"
+            f"Balance: `{bal_eth:.4f} ETH`"
+            f"USD Value: `${current_usd:,.2f}` of `${CAMPAIGN_TARGET_USD:,.2f}`"
+            f"Progress: `{percent:.1f}%`"
         )
 
         # Generate simple progress bar image
@@ -344,6 +340,9 @@ dispatcher.add_handler(CommandHandler("status", status_command))
 dispatcher.add_handler(CommandHandler("switches", switches_command))
 dispatcher.add_handler(CommandHandler("help", help_command))
 dispatcher.add_handler(CommandHandler("commands", commands_command))
+
+
+  
 
 
   
