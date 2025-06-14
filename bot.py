@@ -341,7 +341,7 @@ def help_command(update, context):
     )
     update.message.reply_text(help_text)
 
-dispatcher = Dispatcher(bot, None, workers=1, use_context=True)(bot, None, workers=1, use_context=True)
+dispatcher = Dispatcher(bot, None, workers=1, use_context=True)
 
 dispatcher.add_handler(CommandHandler("uptime", uptime_command))
 dispatcher.add_handler(CommandHandler("start", start_command))
