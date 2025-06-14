@@ -20,6 +20,11 @@ TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_IDS = [chat_id.strip() for chat_id in os.getenv('TELEGRAM_CHAT_ID', '').split(',') if chat_id.strip()]
 ETHEREUM_RPC_URL = os.getenv('ETHEREUM_RPC_URL')
 
+# Campaign summary configuration
+ENABLE_CAMPAIGN_SUMMARY = os.getenv('ENABLE_CAMPAIGN_SUMMARY', 'true').lower() in ('true', '1', 'yes', 'on')
+SUMMARY_INTERVAL_MINUTES = int(os.getenv('SUMMARY_INTERVAL_MINUTES', '120'))  # Default 2 hours
+STATIC_ETH_PRICE = os.getenv('STATIC_ETH_PRICE')  # Optional static price for testing
+
 WALLETS_TO_TRACK = {
     '0xd9aD5Acc883D8a67ab612B70C11abF33dD450A45': 'FRIC/ETH',
     '0xda1916b0d6B209A143009214Cac95e771c4aa277': 'FRIC/ETH'
@@ -288,6 +293,83 @@ def check_blocks():
     last_checked = latest
 
 # ---------------- CAMPAIGN SUMMARY ---------------- #
+# Cache for ETH price to avoid rate limiting
+eth_price_cache = {'price': 0, 'timestamp': 0}
+PRICE_CACHE_DURATION = 300  # 5 minutes
+
+def get_eth_price():
+    """Get ETH price with caching and multiple fallbacks"""
+    global eth_price_cache
+    
+    # Use static price if configured (useful for testing)
+    if STATIC_ETH_PRICE:
+        try:
+            static_price = float(STATIC_ETH_PRICE)
+            logger.info(f"Using static ETH price: ${static_price}")
+            return static_price
+        except ValueError:
+            logger.warning(f"Invalid STATIC_ETH_PRICE value: {STATIC_ETH_PRICE}")
+    
+    # Return cached price if still valid
+    if (time.time() - eth_price_cache['timestamp']) < PRICE_CACHE_DURATION:
+        logger.debug(f"Using cached ETH price: ${eth_price_cache['price']}")
+        return eth_price_cache['price']
+    
+    # Try multiple price sources
+    price_sources = [
+        {
+            'name': 'CoinGecko',
+            'url': 'https://api.coingecko.com/api/v3/simple/price',
+            'params': {'ids': 'ethereum', 'vs_currencies': 'usd'},
+            'parser': lambda data: data.get('ethereum', {}).get('usd', 0)
+        },
+        {
+            'name': 'CryptoCompare',
+            'url': 'https://min-api.cryptocompare.com/data/price',
+            'params': {'fsym': 'ETH', 'tsyms': 'USD'},
+            'parser': lambda data: data.get('USD', 0)
+        },
+        {
+            'name': 'Binance',
+            'url': 'https://api.binance.com/api/v3/ticker/price',
+            'params': {'symbol': 'ETHUSDT'},
+            'parser': lambda data: float(data.get('price', 0))
+        }
+    ]
+    
+    for source in price_sources:
+        try:
+            response = requests.get(
+                source['url'],
+                params=source['params'],
+                timeout=10,
+                headers={'User-Agent': 'Frictionless-Bot/1.0'}
+            )
+            
+            if response.status_code == 200:
+                price_data = response.json()
+                price = source['parser'](price_data)
+                
+                if price > 0:
+                    # Update cache
+                    eth_price_cache = {
+                        'price': price,
+                        'timestamp': time.time()
+                    }
+                    logger.info(f"ETH price updated from {source['name']}: ${price}")
+                    return price
+                    
+        except Exception as e:
+            logger.warning(f"Failed to get price from {source['name']}: {e}")
+    
+    # Return cached price even if expired, or 0 if no cache
+    if eth_price_cache['price'] > 0:
+        logger.warning("Using expired cached ETH price")
+        return eth_price_cache['price']
+    
+    logger.error("Could not fetch ETH price from any source")
+    return 0
+
 def send_campaign_summary():
     """Send periodic fundraising campaign updates"""
     try:
@@ -299,19 +381,11 @@ def send_campaign_summary():
         bal_wei = w3.eth.get_balance(CAMPAIGN_ADDRESS)
         bal_eth = w3.from_wei(bal_wei, 'ether')
         
-        # Get ETH price
-        response = requests.get(
-            "https://api.coingecko.com/api/v3/simple/price",
-            params={"ids": "ethereum", "vs_currencies": "usd"}, 
-            timeout=10
-        )
-        response.raise_for_status()
-        
-        price_data = response.json()
-        price_usd = price_data.get('ethereum', {}).get('usd', 0)
+        # Get ETH price with fallbacks and caching
+        price_usd = get_eth_price()
         
         if price_usd == 0:
-            logger.warning("Could not fetch ETH price")
+            logger.warning("Could not fetch ETH price - skipping summary")
             return
             
         current_usd = float(bal_eth) * price_usd
@@ -369,14 +443,21 @@ def run_scanner():
 
 def run_summary():
     """Background thread for periodic fundraising summaries"""
-    logger.info("✅ Summary thread started")
+    if not ENABLE_CAMPAIGN_SUMMARY:
+        logger.info("📊 Campaign summary disabled via ENABLE_CAMPAIGN_SUMMARY")
+        return
+        
+    logger.info(f"✅ Summary thread started - interval: {SUMMARY_INTERVAL_MINUTES} minutes")
+    interval_seconds = SUMMARY_INTERVAL_MINUTES * 60
+    
     while True:
         try:
             send_campaign_summary()
-            time.sleep(1740)  # 29 minutes between summaries
+            logger.info(f"Next campaign summary in {SUMMARY_INTERVAL_MINUTES} minutes")
+            time.sleep(interval_seconds)
         except Exception as e:
             logger.error(f"Summary thread error: {e}")
-            time.sleep(300)  # Wait 5 minutes before retrying
+            time.sleep(600)  # Wait 10 minutes before retrying
 
 # ---------------- TELEGRAM COMMANDS ---------------- #
 def start_command(update: Update, context: CallbackContext):
@@ -414,12 +495,104 @@ def uptime_command(update: Update, context: CallbackContext):
     minutes, seconds = divmod(remainder, 60)
     update.message.reply_text(f"⏱ Bot uptime: {hours}h {minutes}m {seconds}s")
 
+def config_command(update: Update, context: CallbackContext):
+    """Handle /config command - show current configuration"""
+    config_text = (
+        "*Bot Configuration:*\n\n"
+        f"🔗 **Blockchain:**\n"
+        f"• Network: Ethereum\n"
+        f"• Current Block: `{w3.eth.block_number if w3.is_connected() else 'disconnected'}`\n"
+        f"• Last Checked: `{last_checked}`\n\n"
+        f"👥 **Telegram:**\n"
+        f"• Chat IDs: `{len(TELEGRAM_CHAT_IDS)} configured`\n\n"
+        f"💰 **Campaign:**\n"
+        f"• Address: `{CAMPAIGN_ADDRESS[:10]}...{CAMPAIGN_ADDRESS[-8:] if CAMPAIGN_ADDRESS else 'Not set'}`\n"
+        f"• Target: `${CAMPAIGN_TARGET_USD:,.2f}`\n"
+        f"• Summary Enabled: `{ENABLE_CAMPAIGN_SUMMARY}`\n"
+        f"• Summary Interval: `{SUMMARY_INTERVAL_MINUTES} minutes`\n\n"
+        f"🔍 **Tracking:**\n"
+        f"• Wallets: `{len(WALLETS_TO_TRACK)} addresses`\n"
+        f"• Static Price: `{'
+
+def help_command(update: Update, context: CallbackContext):
+    """Handle /help command"""
+    help_text = (
+        "📚 *Frictionless Platform Help*\n\n"
+        "🔗 [User Guide](https://frictionless-2.gitbook.io/http-www.frictionless.help)\n"
+        "💬 For support, contact the development team."
+    )
+    update.message.reply_text(help_text, parse_mode='Markdown')
+
+# ---------------- FLASK ROUTES ---------------- #
+@app.route('/', methods=['GET'])
+def home():
+    """Health check endpoint"""
+    return {
+        'status': 'running',
+        'uptime_seconds': int(time.time() - start_time),
+        'last_checked_block': last_checked,
+        'current_block': w3.eth.block_number if w3.is_connected() else 'disconnected'
+    }
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    """Telegram webhook endpoint"""
+    try:
+        if request.method == "POST":
+            update = Update.de_json(request.get_json(force=True), bot)
+            dispatcher.process_update(update)
+        return "ok"
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+        return "error", 500
+
+# ---------------- INITIALIZATION ---------------- #
+# Setup Telegram dispatcher
+dispatcher = Dispatcher(bot, None, workers=1, use_context=True)
+
+# Register command handlers
+dispatcher.add_handler(CommandHandler("start", start_command))
+dispatcher.add_handler(CommandHandler("status", status_command))
+dispatcher.add_handler(CommandHandler("config", config_command))
+dispatcher.add_handler(CommandHandler("switches", switches_command))
+dispatcher.add_handler(CommandHandler("uptime", uptime_command))
+dispatcher.add_handler(CommandHandler("commands", commands_command))
+dispatcher.add_handler(CommandHandler("help", help_command))
+
+# Start background threads
+scanner_thread = threading.Thread(target=run_scanner, daemon=True)
+scanner_thread.start()
+
+# Only start summary thread if enabled
+if ENABLE_CAMPAIGN_SUMMARY:
+    summary_thread = threading.Thread(target=run_summary, daemon=True)
+    summary_thread.start()
+else:
+    logger.info("📊 Campaign summary thread disabled")
+
+# Setup webhook
+webhook_url = os.environ.get('WEBHOOK_URL')
+if webhook_url:
+    try:
+        bot.set_webhook(url=f"{webhook_url}/webhook")
+        logger.info(f"Webhook set to {webhook_url}/webhook")
+    except Exception as e:
+        logger.error(f"Failed to set webhook: {e}")
+
+logger.info("🚀 Frictionless Telegram Bot started successfully")
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000))) + STATIC_ETH_PRICE if STATIC_ETH_PRICE else 'Dynamic pricing'}`"
+    )
+    update.message.reply_text(config_text, parse_mode='Markdown')
+
 def commands_command(update: Update, context: CallbackContext):
     """Handle /commands command"""
     commands_text = (
         "*Available Commands:*\n\n"
         "`/start` - Show startup confirmation\n"
         "`/status` - Show current block height and connection status\n"
+        "`/config` - Show bot configuration\n"
         "`/switches` - List all tracked wallet addresses\n"
         "`/uptime` - Show bot uptime\n"
         "`/help` - Link to Frictionless Platform User Guide\n"
@@ -475,8 +648,12 @@ dispatcher.add_handler(CommandHandler("help", help_command))
 scanner_thread = threading.Thread(target=run_scanner, daemon=True)
 scanner_thread.start()
 
-summary_thread = threading.Thread(target=run_summary, daemon=True)
-summary_thread.start()
+# Only start summary thread if enabled
+if ENABLE_CAMPAIGN_SUMMARY:
+    summary_thread = threading.Thread(target=run_summary, daemon=True)
+    summary_thread.start()
+else:
+    logger.info("📊 Campaign summary thread disabled")
 
 # Setup webhook
 webhook_url = os.environ.get('WEBHOOK_URL')
