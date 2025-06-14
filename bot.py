@@ -497,6 +497,16 @@ def uptime_command(update: Update, context: CallbackContext):
 
 def config_command(update: Update, context: CallbackContext):
     """Handle /config command - show current configuration"""
+    # Determine price mode text
+    if STATIC_ETH_PRICE:
+        try:
+            static_price = float(STATIC_ETH_PRICE)
+            price_mode = f"Static (${static_price})`"
+        except ValueError:
+            price_mode = f"Invalid static price: {STATIC_ETH_PRICE}`"
+    else:
+        price_mode = "Dynamic pricing`"
+    
     config_text = (
         "*Bot Configuration:*\n\n"
         f"🔗 **Blockchain:**\n"
@@ -512,7 +522,69 @@ def config_command(update: Update, context: CallbackContext):
         f"• Summary Interval: `{SUMMARY_INTERVAL_MINUTES} minutes`\n\n"
         f"🔍 **Tracking:**\n"
         f"• Wallets: `{len(WALLETS_TO_TRACK)} addresses`\n"
-        f"• Static Price: `{'
+        f"• Price Mode: `{price_mode}"
+    )
+    update.message.reply_text(config_text, parse_mode='Markdown')
+
+def commands_command(update: Update, context: CallbackContext):
+    """Handle /commands command"""
+    commands_text = (
+        "*Available Commands:*\n\n"
+        "`/start` - Show startup confirmation\n"
+        "`/status` - Show current block height and connection status\n"
+        "`/config` - Show bot configuration\n"
+        "`/campaign` - Show current campaign status\n"
+        "`/switches` - List all tracked wallet addresses\n"
+        "`/uptime` - Show bot uptime\n"
+        "`/help` - Link to Frictionless Platform User Guide\n"
+        "`/commands` - List all available commands"
+    )
+    update.message.reply_text(commands_text, parse_mode='Markdown')
+
+def campaign_command(update: Update, context: CallbackContext):
+    """Handle /campaign command - show current campaign status"""
+    try:
+        # Check if campaign summary is enabled
+        if not ENABLE_CAMPAIGN_SUMMARY:
+            update.message.reply_text("No active campaigns currently")
+            return
+        
+        # Validate campaign address
+        if not CAMPAIGN_ADDRESS or not w3.is_address(CAMPAIGN_ADDRESS):
+            update.message.reply_text("❌ Invalid campaign address configured")
+            return
+
+        # Get campaign balance
+        bal_wei = w3.eth.get_balance(CAMPAIGN_ADDRESS)
+        bal_eth = w3.from_wei(bal_wei, 'ether')
+        
+        # Get ETH price
+        price_usd = get_eth_price()
+        
+        if price_usd == 0:
+            update.message.reply_text("❌ Could not fetch ETH price for campaign status")
+            return
+            
+        current_usd = float(bal_eth) * price_usd
+        percent = min(100, (current_usd / CAMPAIGN_TARGET_USD) * 100)
+
+        # Build campaign status message
+        status_msg = (
+            "📊 *Current Campaign Status*\n\n"
+            f"💰 **Balance:** `{bal_eth:.4f} ETH`\n"
+            f"💵 **USD Value:** `${current_usd:,.2f}`\n"
+            f"🎯 **Target:** `${CAMPAIGN_TARGET_USD:,.2f}`\n"
+            f"📈 **Progress:** `{percent:.1f}%`\n"
+            f"📍 **Address:** `{CAMPAIGN_ADDRESS[:10]}...{CAMPAIGN_ADDRESS[-8:]}`\n\n"
+            f"🔄 **Price Source:** `{'Static' if STATIC_ETH_PRICE else 'Dynamic'}`\n"
+            f"💲 **ETH Price:** `${price_usd:,.2f}`"
+        )
+        
+        update.message.reply_text(status_msg, parse_mode='Markdown')
+        
+    except Exception as e:
+        logger.error(f"Error in campaign_command: {e}")
+        update.message.reply_text(f"❌ Error fetching campaign status: {str(e)}")
 
 def help_command(update: Update, context: CallbackContext):
     """Handle /help command"""
@@ -554,91 +626,7 @@ dispatcher = Dispatcher(bot, None, workers=1, use_context=True)
 dispatcher.add_handler(CommandHandler("start", start_command))
 dispatcher.add_handler(CommandHandler("status", status_command))
 dispatcher.add_handler(CommandHandler("config", config_command))
-dispatcher.add_handler(CommandHandler("switches", switches_command))
-dispatcher.add_handler(CommandHandler("uptime", uptime_command))
-dispatcher.add_handler(CommandHandler("commands", commands_command))
-dispatcher.add_handler(CommandHandler("help", help_command))
-
-# Start background threads
-scanner_thread = threading.Thread(target=run_scanner, daemon=True)
-scanner_thread.start()
-
-# Only start summary thread if enabled
-if ENABLE_CAMPAIGN_SUMMARY:
-    summary_thread = threading.Thread(target=run_summary, daemon=True)
-    summary_thread.start()
-else:
-    logger.info("📊 Campaign summary thread disabled")
-
-# Setup webhook
-webhook_url = os.environ.get('WEBHOOK_URL')
-if webhook_url:
-    try:
-        bot.set_webhook(url=f"{webhook_url}/webhook")
-        logger.info(f"Webhook set to {webhook_url}/webhook")
-    except Exception as e:
-        logger.error(f"Failed to set webhook: {e}")
-
-logger.info("🚀 Frictionless Telegram Bot started successfully")
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000))) + STATIC_ETH_PRICE if STATIC_ETH_PRICE else 'Dynamic pricing'}`"
-    )
-    update.message.reply_text(config_text, parse_mode='Markdown')
-
-def commands_command(update: Update, context: CallbackContext):
-    """Handle /commands command"""
-    commands_text = (
-        "*Available Commands:*\n\n"
-        "`/start` - Show startup confirmation\n"
-        "`/status` - Show current block height and connection status\n"
-        "`/config` - Show bot configuration\n"
-        "`/switches` - List all tracked wallet addresses\n"
-        "`/uptime` - Show bot uptime\n"
-        "`/help` - Link to Frictionless Platform User Guide\n"
-        "`/commands` - List all available commands"
-    )
-    update.message.reply_text(commands_text, parse_mode='Markdown')
-
-def help_command(update: Update, context: CallbackContext):
-    """Handle /help command"""
-    help_text = (
-        "📚 *Frictionless Platform Help*\n\n"
-        "🔗 [User Guide](https://frictionless-2.gitbook.io/http-www.frictionless.help)\n"
-        "💬 For support, contact the development team."
-    )
-    update.message.reply_text(help_text, parse_mode='Markdown')
-
-# ---------------- FLASK ROUTES ---------------- #
-@app.route('/', methods=['GET'])
-def home():
-    """Health check endpoint"""
-    return {
-        'status': 'running',
-        'uptime_seconds': int(time.time() - start_time),
-        'last_checked_block': last_checked,
-        'current_block': w3.eth.block_number if w3.is_connected() else 'disconnected'
-    }
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    """Telegram webhook endpoint"""
-    try:
-        if request.method == "POST":
-            update = Update.de_json(request.get_json(force=True), bot)
-            dispatcher.process_update(update)
-        return "ok"
-    except Exception as e:
-        logger.error(f"Webhook error: {e}")
-        return "error", 500
-
-# ---------------- INITIALIZATION ---------------- #
-# Setup Telegram dispatcher
-dispatcher = Dispatcher(bot, None, workers=1, use_context=True)
-
-# Register command handlers
-dispatcher.add_handler(CommandHandler("start", start_command))
-dispatcher.add_handler(CommandHandler("status", status_command))
+dispatcher.add_handler(CommandHandler("campaign", campaign_command))
 dispatcher.add_handler(CommandHandler("switches", switches_command))
 dispatcher.add_handler(CommandHandler("uptime", uptime_command))
 dispatcher.add_handler(CommandHandler("commands", commands_command))
