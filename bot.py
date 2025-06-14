@@ -208,9 +208,7 @@ def check_blocks():
 
     last_checked = latest
 
-# ---------------- TELEGRAM COMMANDS ---------------- #
-from telegram.ext import Dispatcher, CallbackContext
-from telegram import Update
+# ---------------- TELEGRAM  ---------------- #
 
 app = Flask(__name__)
 
