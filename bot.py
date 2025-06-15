@@ -632,7 +632,7 @@ def commands_command(update: Update, context: CallbackContext):
     update.message.reply_text(commands_text, parse_mode='Markdown')
 
 def campaign_command(update: Update, context: CallbackContext):
-    """Handle /campaign command - show current campaign status"""
+    """Handle /campaign command - show current campaign status with visual progress"""
     try:
         # Check if campaign summary is enabled
         if not ENABLE_CAMPAIGN_SUMMARY:
@@ -658,14 +658,35 @@ def campaign_command(update: Update, context: CallbackContext):
         current_usd = float(bal_eth) * price_usd
         percent = min(100, (current_usd / CAMPAIGN_TARGET_USD) * 100)
 
-        # Build campaign status message
+        # Build visual progress bar (same logic as send_campaign_summary)
+        progress_blocks = "█" * int(percent // 4) + "░" * (25 - int(percent // 4))
+        
+        # Choose emoji and status text based on progress
+        if percent >= 100:
+            status_emoji = "🎉"
+            status_text = "GOAL ACHIEVED!"
+        elif percent >= 75:
+            status_emoji = "🔥"
+            status_text = "Almost There!"
+        elif percent >= 50:
+            status_emoji = "📈"
+            status_text = "Halfway Mark!"
+        elif percent >= 25:
+            status_emoji = "💪"
+            status_text = "Building Momentum"
+        else:
+            status_emoji = "🚀"
+            status_text = "Getting Started"
+
+        # Build enhanced campaign status message with progress blocks
         status_msg = (
-            "📊 *Current Campaign Status*\n\n"
+            f"{status_emoji} *{status_text}*\n\n"
             f"💰 **Balance:** `{bal_eth:.4f} ETH`\n"
-            f"💵 **USD Value:** `${current_usd:,.2f}`\n"
-            f"🎯 **Target:** `${CAMPAIGN_TARGET_USD:,.2f}`\n"
-            f"📈 **Progress:** `{percent:.1f}%`\n"
-            f"📍 **Address:** `{CAMPAIGN_ADDRESS[:10]}...{CAMPAIGN_ADDRESS[-8:]}`\n\n"
+            f"💵 **Value:** `${current_usd:,.2f}` / `${CAMPAIGN_TARGET_USD:,.2f}`\n"
+            f"📊 **Progress:** `{percent:.1f}%`\n\n"
+            f"```\n{progress_blocks}\n```\n"
+            f"`{percent:.1f}%` Complete\n\n"
+            f"📍 **Address:** `{CAMPAIGN_ADDRESS}`\n"
             f"🔄 **Price Source:** `{'Static' if STATIC_ETH_PRICE else 'Dynamic'}`\n"
             f"💲 **ETH Price:** `${price_usd:,.2f}`"
         )
