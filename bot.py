@@ -486,7 +486,7 @@ def send_campaign_summary():
                ha='center', va='center', fontsize=16, color='white', fontweight='bold')
         
         # Add title at the top
-        ax.text(50, bar_y + 1.0, '🎯 Fundraising Progress', 
+        ax.text(50, bar_y + 1.0, 'Fundraising Progress', 
                ha='center', va='center', fontsize=18, color='white', fontweight='bold')
         
         # Customize the chart
