@@ -476,29 +476,29 @@ def send_campaign_summary():
                    color='white', zorder=10)
         
         # Add value labels
-        ax.text(0, bar_y - 0.8, f'${current_usd:,.0f}', 
+        ax.text(0, bar_y - 0.6, f'${current_usd:,.0f}', 
                ha='left', va='center', fontsize=12, color='#cccccc', fontweight='bold')
-        ax.text(100, bar_y - 0.8, f'${CAMPAIGN_TARGET_USD:,.0f}', 
+        ax.text(100, bar_y - 0.6, f'${CAMPAIGN_TARGET_USD:,.0f}', 
                ha='right', va='center', fontsize=12, color='#cccccc', fontweight='bold')
         
         # Add ETH amount
-        ax.text(50, bar_y + 0.8, f'{bal_eth:.4f} ETH', 
+        ax.text(50, bar_y + 0.6, f'{bal_eth:.4f} ETH', 
                ha='center', va='center', fontsize=16, color='white', fontweight='bold')
+        
+        # Add title at the top
+        ax.text(50, bar_y + 1.0, '🎯 Fundraising Progress', 
+               ha='center', va='center', fontsize=18, color='white', fontweight='bold')
         
         # Customize the chart
         ax.set_xlim(-2, 102)
-        ax.set_ylim(-0.5, 1.5)
+        ax.set_ylim(-1, 1.5)
         ax.axis('off')
-        
-        # Add title
-        fig.suptitle('🎯 Fundraising Progress', fontsize=18, color='white', 
-                    fontweight='bold', y=0.85)
         
         # Save with transparent background and high quality
         img_path = '/tmp/progress.png'
         fig.savefig(img_path, bbox_inches='tight', dpi=150, 
                    facecolor='#1a1a1a', edgecolor='none', 
-                   transparent=False, pad_inches=0.2)
+                   transparent=False, pad_inches=0.3)
         plt.close(fig)
 
         # Send to all Telegram chats
