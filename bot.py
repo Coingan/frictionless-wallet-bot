@@ -371,7 +371,7 @@ def get_eth_price():
     return 0
 
 def send_campaign_summary():
-    """Send periodic fundraising campaign updates"""
+    """Send periodic fundraising campaign updates with enhanced visuals"""
     try:
         # Validate campaign address
         if not CAMPAIGN_ADDRESS or not w3.is_address(CAMPAIGN_ADDRESS):
@@ -391,24 +391,114 @@ def send_campaign_summary():
         current_usd = float(bal_eth) * price_usd
         percent = min(100, (current_usd / CAMPAIGN_TARGET_USD) * 100)
 
-        # Build summary message
+        # Build enhanced summary message with emoji progress bar
+        progress_blocks = "█" * int(percent // 4) + "░" * (25 - int(percent // 4))
+        
+        # Choose emoji based on progress
+        if percent >= 100:
+            status_emoji = "🎉"
+            status_text = "GOAL ACHIEVED!"
+        elif percent >= 75:
+            status_emoji = "🔥"
+            status_text = "Almost There!"
+        elif percent >= 50:
+            status_emoji = "📈"
+            status_text = "Halfway Mark!"
+        elif percent >= 25:
+            status_emoji = "💪"
+            status_text = "Building Momentum"
+        else:
+            status_emoji = "🚀"
+            status_text = "Getting Started"
+
         msg = (
-            "*Fundraising Update*\n\n"
-            f"Balance: `{bal_eth:.4f} ETH`\n"
-            f"USD Value: `${current_usd:,.2f}` of `${CAMPAIGN_TARGET_USD:,.2f}`\n"
-            f"Progress: `{percent:.1f}%`"
+            f"{status_emoji} *{status_text}*\n\n"
+            f"💰 **Balance:** `{bal_eth:.4f} ETH`\n"
+            f"💵 **Value:** `${current_usd:,.2f}` / `${CAMPAIGN_TARGET_USD:,.2f}`\n"
+            f"📊 **Progress:** `{percent:.1f}%`\n\n"
+            f"```\n{progress_blocks}\n```\n"
+            f"`{percent:.1f}%` Complete"
         )
 
-        # Generate progress bar chart
-        fig, ax = plt.subplots(figsize=(6, 1))
-        ax.barh(0, percent, color='green', height=0.5)
-        ax.barh(0, 100 - percent, left=percent, color='lightgray', height=0.5)
-        ax.set_xlim(0, 100)
-        ax.set_ylim(-0.5, 0.5)
+        # Create enhanced progress bar chart
+        fig, ax = plt.subplots(figsize=(10, 2.5), facecolor='#1a1a1a')
+        ax.set_facecolor('#1a1a1a')
+        
+        # Create gradient effect for progress bar
+        import numpy as np
+        from matplotlib.colors import LinearSegmentedColormap
+        
+        # Define gradient colors based on progress
+        if percent >= 75:
+            colors = ['#ff6b35', '#f7931e', '#ffcd3c']  # Orange to yellow gradient
+        elif percent >= 50:
+            colors = ['#4ecdc4', '#44a08d', '#093637']  # Teal gradient
+        elif percent >= 25:
+            colors = ['#667eea', '#764ba2', '#f093fb']  # Purple gradient
+        else:
+            colors = ['#2196f3', '#21cbf3', '#2196f3']  # Blue gradient
+            
+        # Create custom colormap
+        n_bins = 100
+        cmap = LinearSegmentedColormap.from_list('progress', colors, N=n_bins)
+        
+        # Create the main progress bar
+        bar_height = 0.6
+        bar_y = 0.5
+        
+        # Background bar (unfilled portion)
+        ax.barh(bar_y, 100, height=bar_height, color='#333333', alpha=0.3, 
+                edgecolor='#555555', linewidth=2)
+        
+        # Progress bar with gradient
+        if percent > 0:
+            # Create gradient effect by drawing multiple thin bars
+            x_vals = np.linspace(0, percent, int(percent) + 1)
+            for i, x in enumerate(x_vals[:-1]):
+                color_intensity = i / len(x_vals) if len(x_vals) > 1 else 0.5
+                ax.barh(bar_y, 1, left=x, height=bar_height, 
+                       color=cmap(color_intensity), alpha=0.9)
+        
+        # Add glow effect
+        for i in range(3):
+            ax.barh(bar_y, percent, height=bar_height + 0.1 * (3-i), 
+                   color=colors[0], alpha=0.1 * (i+1), 
+                   edgecolor='none', zorder=0)
+        
+        # Add percentage text on the bar
+        if percent > 10:
+            ax.text(percent/2, bar_y, f'{percent:.1f}%', 
+                   ha='center', va='center', fontsize=14, fontweight='bold',
+                   color='white', zorder=10)
+        else:
+            ax.text(percent + 5, bar_y, f'{percent:.1f}%', 
+                   ha='left', va='center', fontsize=14, fontweight='bold',
+                   color='white', zorder=10)
+        
+        # Add value labels
+        ax.text(0, bar_y - 0.8, f'${current_usd:,.0f}', 
+               ha='left', va='center', fontsize=12, color='#cccccc', fontweight='bold')
+        ax.text(100, bar_y - 0.8, f'${CAMPAIGN_TARGET_USD:,.0f}', 
+               ha='right', va='center', fontsize=12, color='#cccccc', fontweight='bold')
+        
+        # Add ETH amount
+        ax.text(50, bar_y + 0.8, f'{bal_eth:.4f} ETH', 
+               ha='center', va='center', fontsize=16, color='white', fontweight='bold')
+        
+        # Customize the chart
+        ax.set_xlim(-2, 102)
+        ax.set_ylim(-0.5, 1.5)
         ax.axis('off')
         
+        # Add title
+        fig.suptitle('🎯 Fundraising Progress', fontsize=18, color='white', 
+                    fontweight='bold', y=0.85)
+        
+        # Save with transparent background and high quality
         img_path = '/tmp/progress.png'
-        fig.savefig(img_path, bbox_inches='tight', dpi=100)
+        fig.savefig(img_path, bbox_inches='tight', dpi=150, 
+                   facecolor='#1a1a1a', edgecolor='none', 
+                   transparent=False, pad_inches=0.2)
         plt.close(fig)
 
         # Send to all Telegram chats
