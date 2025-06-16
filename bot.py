@@ -445,7 +445,7 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
     
     # Create the main progress bar - MOVED DOWN to avoid text overlap
     bar_height = 0.6
-    bar_y = -0.9  # Moved down from -0.1 to -0.9
+    bar_y = -0.7  # Moved up from -0.9
     
     # Background bar (unfilled portion) with subtle glow - MORE TRANSPARENT
     ax.barh(bar_y, 100, height=bar_height, color='#333333', alpha=0.2, 
@@ -493,11 +493,11 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
         add_clean_text(percent + 8, bar_y, f'{percent:.1f}%', 16)
     
     # Add value labels - ADJUSTED POSITIONS
-    add_clean_text(5, bar_y - 1.2, f'${current_usd:,.0f}', 14, color='#cccccc')  # Moved up down from -0.5
-    add_clean_text(95, bar_y - 1.2, f'${CAMPAIGN_TARGET_USD:,.0f}', 14, color='#cccccc') # Moved down from -0.5
+    add_clean_text(5, bar_y - .7, f'${current_usd:,.0f}', 14, color='#cccccc')  # Moved up from -1.2
+    add_clean_text(95, bar_y - .7, f'${CAMPAIGN_TARGET_USD:,.0f}', 14, color='#cccccc') # Moved up from -1.2
     
     # Add title - ADJUSTED POSITION  
-    add_clean_text(50, bar_y + 1.2, 'Frictionless Fundraising Progress', 20, color='#ffffff')
+    add_clean_text(50, bar_y + 1.7, 'Frictionless Fundraising Progress', 20, color='#ffffff')
     
     # Add decorative elements - REDUCED OPACITY
     # Corner decorations
