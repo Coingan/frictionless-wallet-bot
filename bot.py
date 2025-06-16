@@ -416,8 +416,7 @@ def send_campaign_summary():
             f"💰 **Balance:** `{bal_eth:.4f} ETH`\n"
             f"💵 **Value:** `${current_usd:,.2f}` / `${CAMPAIGN_TARGET_USD:,.2f}`\n"
             f"📊 **Progress:** `{percent:.1f}%`\n\n"
-            f"```\n{progress_blocks}\n```\n"
-            f"`{percent:.1f}%` Complete"
+            f"[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/contribute")]
         )
 
         # Create enhanced progress bar chart
@@ -686,9 +685,7 @@ def campaign_command(update: Update, context: CallbackContext):
             f"📊 **Progress:** `{percent:.1f}%`\n\n"
             f"```\n{progress_blocks}\n```\n"
             f"`{percent:.1f}%` Complete\n\n"
-            f"📍 **Address:** `{CAMPAIGN_ADDRESS}`\n"
-            f"🔄 **Price Source:** `{'Static' if STATIC_ETH_PRICE else 'Dynamic'}`\n"
-            f"💲 **ETH Price:** `${price_usd:,.2f}`"
+            f"[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/contribute")]
         )
         
         update.message.reply_text(status_msg, parse_mode='Markdown')
