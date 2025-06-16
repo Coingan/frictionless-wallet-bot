@@ -399,7 +399,7 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
             # Apply effects to make text readable
             bg_img = bg_img.filter(ImageFilter.GaussianBlur(radius=2))  # Blur
             enhancer = ImageEnhance.Brightness(bg_img)
-            bg_img = enhancer.enhance(0.3)  # Darken (0.3 = 30% brightness)
+            bg_img = enhancer.enhance(0.7)  # Darken (0.3 = 30% brightness) changed from .3 to .7 to make it brighter
             
             # Convert to array and display
             bg_array = np.array(bg_img)
@@ -493,11 +493,11 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
         add_clean_text(percent + 8, bar_y, f'{percent:.1f}%', 16)
     
     # Add value labels - ADJUSTED POSITIONS
-    add_clean_text(5, bar_y - .7, f'${current_usd:,.0f}', 14, color='#cccccc')  # Moved up from -1.2
-    add_clean_text(95, bar_y - .7, f'${CAMPAIGN_TARGET_USD:,.0f}', 14, color='#cccccc') # Moved up from -1.2
+    add_clean_text(5, bar_y - .4, f'${current_usd:,.0f}', 14, color='#cccccc')  # Moved up from -1.2
+    add_clean_text(95, bar_y - .4, f'${CAMPAIGN_TARGET_USD:,.0f}', 14, color='#cccccc') # Moved up from -1.2
     
     # Add title - ADJUSTED POSITION  
-    add_clean_text(50, bar_y + 1.7, 'Frictionless Fundraising Progress', 20, color='#ffffff')
+    add_clean_text(50, bar_y + 2.0, 'Frictionless Fundraising Progress', 20, color='#ffffff')
     
     # Add decorative elements - REDUCED OPACITY
     # Corner decorations
