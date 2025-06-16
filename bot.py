@@ -447,78 +447,72 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
     bar_height = 0.6
     bar_y = 0.5
     
-    # Background bar (unfilled portion) with subtle glow
-    ax.barh(bar_y, 100, height=bar_height, color='#333333', alpha=0.4, 
+    # Background bar (unfilled portion) with subtle glow - MORE TRANSPARENT
+    ax.barh(bar_y, 100, height=bar_height, color='#333333', alpha=0.2, 
             edgecolor='#555555', linewidth=2, zorder=2)
     
-    # Add subtle glow behind the background bar
+    # Add subtle glow behind the background bar - REDUCED OPACITY
     for i in range(3):
         ax.barh(bar_y, 100, height=bar_height + 0.1 * (3-i), 
-               color='#333333', alpha=0.05 * (i+1), 
+               color='#333333', alpha=0.02 * (i+1), 
                edgecolor='none', zorder=1)
     
-    # Progress bar with gradient and glow effect
+    # Progress bar with gradient and glow effect - MORE TRANSPARENT
     if percent > 0:
-        # Main progress bar
+        # Main progress bar - REDUCED OPACITY
         x_vals = np.linspace(0, percent, max(int(percent), 1) + 1)
         for i, x in enumerate(x_vals[:-1]):
             color_intensity = i / len(x_vals) if len(x_vals) > 1 else 0.5
             ax.barh(bar_y, 1, left=x, height=bar_height, 
-                   color=cmap(color_intensity), alpha=0.9, zorder=3)
+                   color=cmap(color_intensity), alpha=0.6, zorder=3)  # Reduced from 0.9 to 0.6
         
-        # Add glow effect around progress bar
+        # Add glow effect around progress bar - REDUCED OPACITY
         for i in range(4):
-            glow_alpha = 0.15 * (4-i) / 4
+            glow_alpha = 0.08 * (4-i) / 4  # Reduced from 0.15
             glow_height = bar_height + 0.08 * (4-i)
             ax.barh(bar_y, percent, height=glow_height, 
                    color=colors[0], alpha=glow_alpha, 
                    edgecolor='none', zorder=1)
     
-    # Add shimmer effect on the progress bar
+    # Add shimmer effect on the progress bar - REDUCED OPACITY
     if percent > 5:  # Only add shimmer if there's enough progress to see it
         shimmer_x = np.linspace(0, percent, 20)
         for x in shimmer_x[::3]:  # Every 3rd point for subtle effect
             ax.axvline(x, ymin=0.35, ymax=0.65, color='white', 
-                      alpha=0.3, linewidth=1, zorder=4)
+                      alpha=0.15, linewidth=1, zorder=4)  # Reduced from 0.3
     
-    # Enhanced text with outlines for better readability
-    def add_outlined_text(x, y, text, fontsize, color='white', outline_color='black', outline_width=2):
-        # Add outline
-        for dx, dy in [(-1,-1), (-1,1), (1,-1), (1,1), (-1,0), (1,0), (0,-1), (0,1)]:
-            ax.text(x + dx*outline_width/10, y + dy*outline_width/10, text, 
-                   ha='center', va='center', fontsize=fontsize, 
-                   color=outline_color, fontweight='bold', zorder=5, alpha=0.8)
-        # Add main text
+    # SIMPLIFIED TEXT - NO OUTLINES, SINGLE CLEAN TEXT ONLY
+    def add_clean_text(x, y, text, fontsize, color='white'):
         ax.text(x, y, text, ha='center', va='center', fontsize=fontsize, 
                color=color, fontweight='bold', zorder=6)
     
-    # Add percentage text on the bar with outline
+    # Add percentage text on the bar
     if percent > 10:
-        add_outlined_text(percent/2, bar_y, f'{percent:.1f}%', 16)
+        add_clean_text(percent/2, bar_y, f'{percent:.1f}%', 16)
     else:
-        add_outlined_text(percent + 8, bar_y, f'{percent:.1f}%', 16)
+        add_clean_text(percent + 8, bar_y, f'{percent:.1f}%', 16)
     
-    # Add value labels with outlines
-    add_outlined_text(5, bar_y - 0.7, f'${current_usd:,.0f}', 14, color='#cccccc')
-    add_outlined_text(95, bar_y - 0.7, f'${CAMPAIGN_TARGET_USD:,.0f}', 14, color='#cccccc')
+    # Add value labels
+    add_clean_text(5, bar_y - 0.7, f'${current_usd:,.0f}', 14, color='#cccccc')
+    add_clean_text(95, bar_y - 0.7, f'${CAMPAIGN_TARGET_USD:,.0f}', 14, color='#cccccc')
     
-    # Add ETH amount with outline
-    add_outlined_text(50, bar_y + 0.7, f'{bal_eth:.4f} ETH', 18, color='#ffffff')
+    # Add ETH amount
+    add_clean_text(50, bar_y + 0.7, f'{bal_eth:.4f} ETH', 18, color='#ffffff')
     
-    # Add title with outline and larger font
-    add_outlined_text(50, bar_y + 1.2, 'Frictionless Fundraising Progress', 20, color='#ffffff')
+    # Add title
+    add_clean_text(50, bar_y + 1.2, 'Frictionless Fundraising Progress', 20, color='#ffffff')
     
-    # Add decorative elements
+    # Add decorative elements - REDUCED OPACITY
     # Corner decorations
     corner_size = 3
     ax.plot([102-corner_size, 102, 102], [1.5-corner_size, 1.5-corner_size, 1.5], 
-           color=colors[0], linewidth=3, alpha=0.7, zorder=6)
+           color=colors[0], linewidth=3, alpha=0.4, zorder=6)  # Reduced from 0.7
     ax.plot([-2, -2, -2+corner_size], [1.5, 1.5-corner_size, 1.5-corner_size], 
-           color=colors[0], linewidth=3, alpha=0.7, zorder=6)
+           color=colors[0], linewidth=3, alpha=0.4, zorder=6)
     ax.plot([-2, -2, -2+corner_size], [-1, -1+corner_size, -1+corner_size], 
-           color=colors[0], linewidth=3, alpha=0.7, zorder=6)
+           color=colors[0], linewidth=3, alpha=0.4, zorder=6)
     ax.plot([102-corner_size, 102, 102], [-1+corner_size, -1+corner_size, -1], 
-           color=colors[0], linewidth=3, alpha=0.7, zorder=6)
+           color=colors[0], linewidth=3, alpha=0.4, zorder=6)
     
     # Customize the chart
     ax.set_xlim(-2, 102)
