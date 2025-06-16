@@ -443,9 +443,9 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
     n_bins = 100
     cmap = LinearSegmentedColormap.from_list('progress', colors, N=n_bins)
     
-    # Create the main progress bar
+    # Create the main progress bar - MOVED DOWN to avoid text overlap
     bar_height = 0.6
-    bar_y = 0.5
+    bar_y = -0.1  # Moved down from 0.5 to -0.1
     
     # Background bar (unfilled portion) with subtle glow - MORE TRANSPARENT
     ax.barh(bar_y, 100, height=bar_height, color='#333333', alpha=0.2, 
@@ -492,14 +492,14 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
     else:
         add_clean_text(percent + 8, bar_y, f'{percent:.1f}%', 16)
     
-    # Add value labels
-    add_clean_text(5, bar_y - 0.7, f'${current_usd:,.0f}', 14, color='#cccccc')
-    add_clean_text(95, bar_y - 0.7, f'${CAMPAIGN_TARGET_USD:,.0f}', 14, color='#cccccc')
+    # Add value labels - ADJUSTED POSITIONS
+    add_clean_text(5, bar_y - 0.5, f'${current_usd:,.0f}', 14, color='#cccccc')  # Moved up from -0.7
+    add_clean_text(95, bar_y - 0.5, f'${CAMPAIGN_TARGET_USD:,.0f}', 14, color='#cccccc')
     
-    # Add ETH amount
+    # Add ETH amount - ADJUSTED POSITION
     add_clean_text(50, bar_y + 0.7, f'{bal_eth:.4f} ETH', 18, color='#ffffff')
     
-    # Add title
+    # Add title - ADJUSTED POSITION  
     add_clean_text(50, bar_y + 1.2, 'Frictionless Fundraising Progress', 20, color='#ffffff')
     
     # Add decorative elements - REDUCED OPACITY
@@ -518,6 +518,8 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
     ax.set_xlim(-2, 102)
     ax.set_ylim(-1, 1.5)
     ax.axis('off')
+    
+    return fig
     
     return fig
 
