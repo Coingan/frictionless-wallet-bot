@@ -8,6 +8,7 @@ import logging
 import threading
 import requests
 import matplotlib.pyplot as plt
+import matplotlib.patheffects as path_effects
 from flask import Flask, request
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
@@ -399,7 +400,7 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
             # Apply effects to make text readable
             bg_img = bg_img.filter(ImageFilter.GaussianBlur(radius=2))  # Blur
             enhancer = ImageEnhance.Brightness(bg_img)
-            bg_img = enhancer.enhance(0.9)  # Darken (0.3 = 30% brightness) changed from .7 to .9 to make it brighter
+            bg_img = enhancer.enhance(1.0)  # Darken (0.3 = 30% brightness) changed from .9 to 1.0 to make it brighter
             
             # Convert to array and display
             bg_array = np.array(bg_img)
@@ -477,23 +478,32 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
     # Shimmer effect removed to prevent text overlap
 # The gradient and glow effects provide sufficient visual appeal
     
-    # SIMPLIFIED TEXT - NO OUTLINES, SINGLE CLEAN TEXT ONLY
-    def add_clean_text(x, y, text, fontsize, color='white'):
+# Outlined Text Function
+
+    def add_outlined_text(x, y, text, fontsize, color='white', outline_color='black'):
+        # Draw black outline (multiple offset positions)
+        for dx in [-0.05, 0, 0.05]:
+            for dy in [-0.05, 0, 0.05]:
+                if dx != 0 or dy != 0:  # Skip center
+                    ax.text(x + dx, y + dy, text, ha='center', va='center', 
+                           fontsize=fontsize, color=outline_color, fontweight='bold', zorder=5)
+        
+        # Draw main text on top
         ax.text(x, y, text, ha='center', va='center', fontsize=fontsize, 
                color=color, fontweight='bold', zorder=6)
     
-    # Add percentage text on the bar
+    # Add percentage text on the bar with outline
     if percent > 10:
-        add_clean_text(percent/2, bar_y, f'{percent:.1f}%', 16)
+        add_outlined_text(percent/2, bar_y, f'{percent:.1f}%', 16)
     else:
-        add_clean_text(percent + 8, bar_y, f'{percent:.1f}%', 16)
+        add_outlined_text(percent + 8, bar_y, f'{percent:.1f}%', 16)
     
-    # Add value labels - ADJUSTED POSITIONS
-    add_clean_text(5, bar_y - .4, f'${current_usd:,.0f}', 14, color='#cccccc')  # Moved up from -1.2
-    add_clean_text(95, bar_y - .4, f'${CAMPAIGN_TARGET_USD:,.0f}', 14, color='#cccccc') # Moved up from -1.2
+    # Add value labels with outline - ADJUSTED POSITIONS
+    add_outlined_text(5, bar_y - .4, f'${current_usd:,.0f}', 14, color='#cccccc')  # Moved up from -1.2
+    add_outlined_text(95, bar_y - .4, f'${CAMPAIGN_TARGET_USD:,.0f}', 14, color='#cccccc') # Moved up from -1.2
     
-    # Add title - ADJUSTED POSITION  
-    add_clean_text(50, bar_y + 2.0, 'Frictionless Fundraising Progress', 20, color='#ffffff')
+    # Add title with outline - ADJUSTED POSITION  
+    add_outlined_text(50, bar_y + 1.9, 'Fundraising Progress', 20, color='#ffffff')
     
     # Add decorative elements - REDUCED OPACITY
     # Corner decorations
