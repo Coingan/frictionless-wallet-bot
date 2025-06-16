@@ -411,19 +411,25 @@ def send_campaign_summary():
             status_emoji = "🚀"
             status_text = "Getting Started"
 
+        # Campaign Summary Text
         msg = (
             f"{status_emoji} *{status_text}*\n\n"
             f"💰 **Balance:** `{bal_eth:.4f} ETH`\n"
             f"💵 **Value:** `${current_usd:,.2f}` / `${CAMPAIGN_TARGET_USD:,.2f}`\n"
-            f"📊 **Progress:** `{percent:.1f}%`\n\n"
-            f"[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/contribute")]
+            f"📊 **Progress:** `{percent:.1f}%`"
         )
+
+        # Create proper inline keyboard
+        keyboard = [[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/contribute")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
 
         # Create enhanced progress bar chart
         fig, ax = plt.subplots(figsize=(10, 2.5), facecolor='#1a1a1a')
         ax.set_facecolor('#1a1a1a')
         
-        # Create gradient effect for progress bar
+        # ... (rest of your chart creation code remains the same) ...
+        
+        # [Chart creation code - keeping it as is since it works]
         import numpy as np
         from matplotlib.colors import LinearSegmentedColormap
         
@@ -500,12 +506,14 @@ def send_campaign_summary():
                    transparent=False, pad_inches=0.3)
         plt.close(fig)
 
-        # Send to all Telegram chats
+        # Send to all Telegram chats with proper reply_markup
         for chat_id in TELEGRAM_CHAT_IDS:
             try:
                 with open(img_path, 'rb') as img_file:
                     bot.send_photo(chat_id=chat_id, photo=img_file, timeout=10)
-                bot.send_message(chat_id=chat_id, text=msg, parse_mode='Markdown', timeout=10)
+                # FIXED: Add reply_markup parameter
+                bot.send_message(chat_id=chat_id, text=msg, parse_mode='Markdown', 
+                               reply_markup=reply_markup, timeout=10)
             except Exception as e:
                 logger.error(f"Failed to send campaign update to {chat_id}: {e}")
                 
@@ -677,18 +685,22 @@ def campaign_command(update: Update, context: CallbackContext):
             status_emoji = "🚀"
             status_text = "Getting Started"
 
-        # Build enhanced campaign status message with progress blocks
+        # FIXED: Remove the inline button from message text
         status_msg = (
             f"{status_emoji} *{status_text}*\n\n"
             f"💰 **Balance:** `{bal_eth:.4f} ETH`\n"
             f"💵 **Value:** `${current_usd:,.2f}` / `${CAMPAIGN_TARGET_USD:,.2f}`\n"
             f"📊 **Progress:** `{percent:.1f}%`\n\n"
             f"```\n{progress_blocks}\n```\n"
-            f"`{percent:.1f}%` Complete\n\n"
-            f"[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/contribute")]
+            f"`{percent:.1f}%` Complete"
         )
         
-        update.message.reply_text(status_msg, parse_mode='Markdown')
+        # Create proper inline keyboard
+        keyboard = [[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/contribute")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # Use reply_markup parameter
+        update.message.reply_text(status_msg, parse_mode='Markdown', reply_markup=reply_markup)
         
     except Exception as e:
         logger.error(f"Error in campaign_command: {e}")
