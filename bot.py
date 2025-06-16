@@ -370,10 +370,169 @@ def get_eth_price():
     logger.error("Could not fetch ETH price from any source")
     return 0
 
+# ----------------- Send campaign Summary -------------- #
+#Enhanced chart creation with background image support
+
+def create_enhanced_progress_chart(bal_eth, current_usd, percent):
+    """Create progress chart with optional background image"""
+    import numpy as np
+    from matplotlib.colors import LinearSegmentedColormap
+    import matplotlib.image as mpimg
+    from PIL import Image, ImageFilter, ImageEnhance
+    
+    # Create figure
+    fig, ax = plt.subplots(figsize=(12, 4), facecolor='#1a1a1a')
+    ax.set_facecolor('#1a1a1a')
+    
+    # METHOD 1: Use a local background image file
+    background_image_path = 'background.jpg'  # Your background image
+    
+    if os.path.exists(background_image_path):
+        try:
+            # Load and process background image
+            bg_img = Image.open(background_image_path)
+            
+            # Resize to fit chart dimensions
+            chart_width, chart_height = fig.get_size_inches() * fig.dpi
+            bg_img = bg_img.resize((int(chart_width), int(chart_height)), Image.Resampling.LANCZOS)
+            
+            # Apply effects to make text readable
+            bg_img = bg_img.filter(ImageFilter.GaussianBlur(radius=2))  # Blur
+            enhancer = ImageEnhance.Brightness(bg_img)
+            bg_img = enhancer.enhance(0.3)  # Darken (0.3 = 30% brightness)
+            
+            # Convert to array and display
+            bg_array = np.array(bg_img)
+            ax.imshow(bg_array, extent=[-2, 102, -1, 1.5], aspect='auto', alpha=0.6)
+            
+        except Exception as e:
+            print(f"Could not load background image: {e}")
+    
+    # METHOD 2: Create a gradient background programmatically
+    else:
+        # Create gradient background
+        gradient = np.linspace(0, 1, 256).reshape(1, -1)
+        gradient = np.vstack((gradient, gradient))
+        
+        # Define gradient colors based on progress
+        if percent >= 75:
+            colors = ['#1a0d00', '#331a00', '#4d2600']  # Dark orange gradient
+        elif percent >= 50:
+            colors = ['#001a1a', '#003333', '#004d4d']  # Dark teal gradient
+        elif percent >= 25:
+            colors = ['#0d001a', '#1a0033', '#26004d']  # Dark purple gradient
+        else:
+            colors = ['#000d1a', '#001a33', '#00264d']  # Dark blue gradient
+        
+        # Create custom colormap for background
+        bg_cmap = LinearSegmentedColormap.from_list('bg_gradient', colors, N=256)
+        ax.imshow(gradient, extent=[-2, 102, -1, 1.5], aspect='auto', 
+                 cmap=bg_cmap, alpha=0.4, zorder=0)
+    
+    # Define progress bar colors
+    if percent >= 75:
+        colors = ['#ff6b35', '#f7931e', '#ffcd3c']  # Orange to yellow
+    elif percent >= 50:
+        colors = ['#4ecdc4', '#44a08d', '#093637']  # Teal gradient
+    elif percent >= 25:
+        colors = ['#667eea', '#764ba2', '#f093fb']  # Purple gradient
+    else:
+        colors = ['#2196f3', '#21cbf3', '#2196f3']  # Blue gradient
+    
+    # Create custom colormap for progress bar
+    n_bins = 100
+    cmap = LinearSegmentedColormap.from_list('progress', colors, N=n_bins)
+    
+    # Create the main progress bar
+    bar_height = 0.6
+    bar_y = 0.5
+    
+    # Background bar (unfilled portion) with subtle glow
+    ax.barh(bar_y, 100, height=bar_height, color='#333333', alpha=0.4, 
+            edgecolor='#555555', linewidth=2, zorder=2)
+    
+    # Add subtle glow behind the background bar
+    for i in range(3):
+        ax.barh(bar_y, 100, height=bar_height + 0.1 * (3-i), 
+               color='#333333', alpha=0.05 * (i+1), 
+               edgecolor='none', zorder=1)
+    
+    # Progress bar with gradient and glow effect
+    if percent > 0:
+        # Main progress bar
+        x_vals = np.linspace(0, percent, max(int(percent), 1) + 1)
+        for i, x in enumerate(x_vals[:-1]):
+            color_intensity = i / len(x_vals) if len(x_vals) > 1 else 0.5
+            ax.barh(bar_y, 1, left=x, height=bar_height, 
+                   color=cmap(color_intensity), alpha=0.9, zorder=3)
+        
+        # Add glow effect around progress bar
+        for i in range(4):
+            glow_alpha = 0.15 * (4-i) / 4
+            glow_height = bar_height + 0.08 * (4-i)
+            ax.barh(bar_y, percent, height=glow_height, 
+                   color=colors[0], alpha=glow_alpha, 
+                   edgecolor='none', zorder=1)
+    
+    # Add shimmer effect on the progress bar
+    if percent > 5:  # Only add shimmer if there's enough progress to see it
+        shimmer_x = np.linspace(0, percent, 20)
+        for x in shimmer_x[::3]:  # Every 3rd point for subtle effect
+            ax.axvline(x, ymin=0.35, ymax=0.65, color='white', 
+                      alpha=0.3, linewidth=1, zorder=4)
+    
+    # Enhanced text with outlines for better readability
+    def add_outlined_text(x, y, text, fontsize, color='white', outline_color='black', outline_width=2):
+        # Add outline
+        for dx, dy in [(-1,-1), (-1,1), (1,-1), (1,1), (-1,0), (1,0), (0,-1), (0,1)]:
+            ax.text(x + dx*outline_width/10, y + dy*outline_width/10, text, 
+                   ha='center', va='center', fontsize=fontsize, 
+                   color=outline_color, fontweight='bold', zorder=5, alpha=0.8)
+        # Add main text
+        ax.text(x, y, text, ha='center', va='center', fontsize=fontsize, 
+               color=color, fontweight='bold', zorder=6)
+    
+    # Add percentage text on the bar with outline
+    if percent > 10:
+        add_outlined_text(percent/2, bar_y, f'{percent:.1f}%', 16)
+    else:
+        add_outlined_text(percent + 8, bar_y, f'{percent:.1f}%', 16)
+    
+    # Add value labels with outlines
+    add_outlined_text(5, bar_y - 0.7, f'${current_usd:,.0f}', 14, color='#cccccc')
+    add_outlined_text(95, bar_y - 0.7, f'${CAMPAIGN_TARGET_USD:,.0f}', 14, color='#cccccc')
+    
+    # Add ETH amount with outline
+    add_outlined_text(50, bar_y + 0.7, f'{bal_eth:.4f} ETH', 18, color='#ffffff')
+    
+    # Add title with outline and larger font
+    add_outlined_text(50, bar_y + 1.2, 'Frictionless Fundraising Progress', 20, color='#ffffff')
+    
+    # Add decorative elements
+    # Corner decorations
+    corner_size = 3
+    ax.plot([102-corner_size, 102, 102], [1.5-corner_size, 1.5-corner_size, 1.5], 
+           color=colors[0], linewidth=3, alpha=0.7, zorder=6)
+    ax.plot([-2, -2, -2+corner_size], [1.5, 1.5-corner_size, 1.5-corner_size], 
+           color=colors[0], linewidth=3, alpha=0.7, zorder=6)
+    ax.plot([-2, -2, -2+corner_size], [-1, -1+corner_size, -1+corner_size], 
+           color=colors[0], linewidth=3, alpha=0.7, zorder=6)
+    ax.plot([102-corner_size, 102, 102], [-1+corner_size, -1+corner_size, -1], 
+           color=colors[0], linewidth=3, alpha=0.7, zorder=6)
+    
+    # Customize the chart
+    ax.set_xlim(-2, 102)
+    ax.set_ylim(-1, 1.5)
+    ax.axis('off')
+    
+    return fig
+
+# Modified send_campaign_summary function
 def send_campaign_summary():
     """Send periodic fundraising campaign updates with enhanced visuals"""
     try:
-        # Validate campaign address
+        # ... (validation code remains the same) ...
+        
         if not CAMPAIGN_ADDRESS or not w3.is_address(CAMPAIGN_ADDRESS):
             logger.error("Invalid campaign address")
             return
@@ -381,9 +540,7 @@ def send_campaign_summary():
         bal_wei = w3.eth.get_balance(CAMPAIGN_ADDRESS)
         bal_eth = w3.from_wei(bal_wei, 'ether')
         
-        # Get ETH price with fallbacks and caching
         price_usd = get_eth_price()
-        
         if price_usd == 0:
             logger.warning("Could not fetch ETH price - skipping summary")
             return
@@ -391,10 +548,7 @@ def send_campaign_summary():
         current_usd = float(bal_eth) * price_usd
         percent = min(100, (current_usd / CAMPAIGN_TARGET_USD) * 100)
 
-        # Build enhanced summary message with emoji progress bar
-        progress_blocks = "█" * int(percent // 4) + "░" * (25 - int(percent // 4))
-        
-        # Choose emoji based on progress
+        # Status message logic (same as before)
         if percent >= 100:
             status_emoji = "🎉"
             status_text = "GOAL ACHIEVED!"
@@ -411,7 +565,6 @@ def send_campaign_summary():
             status_emoji = "🚀"
             status_text = "Getting Started"
 
-        # Campaign Summary Text
         msg = (
             f"{status_emoji} *{status_text}*\n\n"
             f"💰 **Balance:** `{bal_eth:.4f} ETH`\n"
@@ -419,105 +572,30 @@ def send_campaign_summary():
             f"📊 **Progress:** `{percent:.1f}%`"
         )
 
-        # Create proper inline keyboard
         keyboard = [[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/contribute")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        # Create enhanced progress bar chart
-        fig, ax = plt.subplots(figsize=(10, 2.5), facecolor='#1a1a1a')
-        ax.set_facecolor('#1a1a1a')
+        # USE THE NEW ENHANCED CHART FUNCTION
+        fig = create_enhanced_progress_chart(bal_eth, current_usd, percent)
         
-        # ... (rest of your chart creation code remains the same) ...
-        
-        # [Chart creation code - keeping it as is since it works]
-        import numpy as np
-        from matplotlib.colors import LinearSegmentedColormap
-        
-        # Define gradient colors based on progress
-        if percent >= 75:
-            colors = ['#ff6b35', '#f7931e', '#ffcd3c']  # Orange to yellow gradient
-        elif percent >= 50:
-            colors = ['#4ecdc4', '#44a08d', '#093637']  # Teal gradient
-        elif percent >= 25:
-            colors = ['#667eea', '#764ba2', '#f093fb']  # Purple gradient
-        else:
-            colors = ['#2196f3', '#21cbf3', '#2196f3']  # Blue gradient
-            
-        # Create custom colormap
-        n_bins = 100
-        cmap = LinearSegmentedColormap.from_list('progress', colors, N=n_bins)
-        
-        # Create the main progress bar
-        bar_height = 0.6
-        bar_y = 0.5
-        
-        # Background bar (unfilled portion)
-        ax.barh(bar_y, 100, height=bar_height, color='#333333', alpha=0.3, 
-                edgecolor='#555555', linewidth=2)
-        
-        # Progress bar with gradient
-        if percent > 0:
-            # Create gradient effect by drawing multiple thin bars
-            x_vals = np.linspace(0, percent, int(percent) + 1)
-            for i, x in enumerate(x_vals[:-1]):
-                color_intensity = i / len(x_vals) if len(x_vals) > 1 else 0.5
-                ax.barh(bar_y, 1, left=x, height=bar_height, 
-                       color=cmap(color_intensity), alpha=0.9)
-        
-        # Add glow effect
-        for i in range(3):
-            ax.barh(bar_y, percent, height=bar_height + 0.1 * (3-i), 
-                   color=colors[0], alpha=0.1 * (i+1), 
-                   edgecolor='none', zorder=0)
-        
-        # Add percentage text on the bar
-        if percent > 10:
-            ax.text(percent/2, bar_y, f'{percent:.1f}%', 
-                   ha='center', va='center', fontsize=14, fontweight='bold',
-                   color='white', zorder=10)
-        else:
-            ax.text(percent + 5, bar_y, f'{percent:.1f}%', 
-                   ha='left', va='center', fontsize=14, fontweight='bold',
-                   color='white', zorder=10)
-        
-        # Add value labels
-        ax.text(0, bar_y - 0.6, f'${current_usd:,.0f}', 
-               ha='left', va='center', fontsize=12, color='#cccccc', fontweight='bold')
-        ax.text(100, bar_y - 0.6, f'${CAMPAIGN_TARGET_USD:,.0f}', 
-               ha='right', va='center', fontsize=12, color='#cccccc', fontweight='bold')
-        
-        # Add ETH amount
-        ax.text(50, bar_y + 0.6, f'{bal_eth:.4f} ETH', 
-               ha='center', va='center', fontsize=16, color='white', fontweight='bold')
-        
-        # Add title at the top
-        ax.text(50, bar_y + 1.0, 'Fundraising Progress', 
-               ha='center', va='center', fontsize=18, color='white', fontweight='bold')
-        
-        # Customize the chart
-        ax.set_xlim(-2, 102)
-        ax.set_ylim(-1, 1.5)
-        ax.axis('off')
-        
-        # Save with transparent background and high quality
-        img_path = '/tmp/progress.png'
-        fig.savefig(img_path, bbox_inches='tight', dpi=150, 
+        # Save with high quality
+        img_path = '/tmp/progress_enhanced.png'
+        fig.savefig(img_path, bbox_inches='tight', dpi=200, 
                    facecolor='#1a1a1a', edgecolor='none', 
-                   transparent=False, pad_inches=0.3)
+                   transparent=False, pad_inches=0.2)
         plt.close(fig)
 
-        # Send to all Telegram chats with proper reply_markup
+        # Send to all Telegram chats
         for chat_id in TELEGRAM_CHAT_IDS:
             try:
                 with open(img_path, 'rb') as img_file:
-                    bot.send_photo(chat_id=chat_id, photo=img_file, timeout=10)
-                # FIXED: Add reply_markup parameter
+                    bot.send_photo(chat_id=chat_id, photo=img_file, timeout=15)
                 bot.send_message(chat_id=chat_id, text=msg, parse_mode='Markdown', 
                                reply_markup=reply_markup, timeout=10)
             except Exception as e:
                 logger.error(f"Failed to send campaign update to {chat_id}: {e}")
                 
-        # Clean up temp file
+        # Clean up
         try:
             os.remove(img_path)
         except Exception:
