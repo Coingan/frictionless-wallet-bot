@@ -399,7 +399,7 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
             # Apply effects to make text readable
             bg_img = bg_img.filter(ImageFilter.GaussianBlur(radius=2))  # Blur
             enhancer = ImageEnhance.Brightness(bg_img)
-            bg_img = enhancer.enhance(0.7)  # Darken (0.3 = 30% brightness) changed from .3 to .7 to make it brighter
+            bg_img = enhancer.enhance(0.9)  # Darken (0.3 = 30% brightness) changed from .7 to .9 to make it brighter
             
             # Convert to array and display
             bg_array = np.array(bg_img)
@@ -474,12 +474,8 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
                    color=colors[0], alpha=glow_alpha, 
                    edgecolor='none', zorder=1)
     
-    # Add shimmer effect on the progress bar - REDUCED OPACITY
-    if percent > 5:  # Only add shimmer if there's enough progress to see it
-        shimmer_x = np.linspace(0, percent, 20)
-        for x in shimmer_x[::3]:  # Every 3rd point for subtle effect
-            ax.axvline(x, ymin=0.35, ymax=0.65, color='white', 
-                      alpha=0.15, linewidth=1, zorder=4)  # Reduced from 0.3
+    # Shimmer effect removed to prevent text overlap
+# The gradient and glow effects provide sufficient visual appeal
     
     # SIMPLIFIED TEXT - NO OUTLINES, SINGLE CLEAN TEXT ONLY
     def add_clean_text(x, y, text, fontsize, color='white'):
