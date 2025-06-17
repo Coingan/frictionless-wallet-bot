@@ -6,6 +6,7 @@ from telegram.ext import Dispatcher, CommandHandler, CallbackContext
 import os
 import logging
 import threading
+from telegram.error import RetryAfter
 import requests
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
@@ -14,6 +15,32 @@ from flask import Flask, request
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
 
+class Config:
+    BLOCK_CHECK_INTERVAL = 60  # seconds
+    SCANNER_ERROR_SLEEP = 30  # seconds
+    SCANNER_MAX_CONSECUTIVE_ERRORS = 5  # max consecutive errors before extended sleep
+    SCANNER_EXTENDED_SLEEP = 300  # 5 minutes extended sleep on repeated failures
+    RATE_LIMIT_COOLDOWN = 120  # seconds
+    MAX_RETRIES = 3
+    PRICE_CACHE_DURATION = 300  # seconds (5 minutes)
+    TELEGRAM_TIMEOUT = 15  # seconds (increased from 10)
+    TELEGRAM_RETRY_DELAY = 2  # seconds
+    SUMMARY_RETRY_SLEEP = 600  # 10 minutes retry for summary (increased from 60)
+    SUMMARY_MAX_CONSECUTIVE_ERRORS = 3  # max consecutive summary errors
+    SUMMARY_EXTENDED_SLEEP = 1800  # 30 minutes extended sleep for summary failures
+    IMAGE_DPI = 200  # Summary Image resolution
+    WEB3_RETRY_DELAY = 5  # seconds
+    WEB3_MAX_RETRIES = 3  # max retries for web3 calls
+
+# Global variables
+w3_lock = threading.Lock()
+eth_price_cache = {'price': 0, 'timestamp': 0}
+
+# New optimization globals
+TOKEN_CACHE = {}
+rpc_calls_today = {'count': 0, 'date': time.strftime('%Y-%m-%d')}
+blocks_processed_count = 0
+    
 # ---------------- CONFIG ---------------- #
 CAMPAIGN_ADDRESS = os.getenv('CAMPAIGN_ADDRESS')
 CAMPAIGN_TARGET_USD = float(os.getenv('CAMPAIGN_TARGET_USD', '50000'))
@@ -83,6 +110,55 @@ last_checked = w3.eth.block_number
 transfer_event_sig = w3.keccak(text="Transfer(address,address,uint256)").hex()
 start_time = time.time()
 
+# ---------------- IMPROVED WEB3 WRAPPER ---------------- #
+def safe_web3_call(func, *args, max_retries=None, **kwargs):
+    """Wrapper for Web3 calls with proper error handling, retries, and RPC monitoring"""
+    global rpc_calls_today
+    
+    if max_retries is None:
+        max_retries = Config.WEB3_MAX_RETRIES
+    
+    # Track RPC usage
+    current_date = time.strftime('%Y-%m-%d')
+    if current_date != rpc_calls_today['date']:
+        rpc_calls_today['count'] = 0
+        rpc_calls_today['date'] = current_date
+        logger.info("🔄 Daily RPC call counter reset")
+    
+    rpc_calls_today['count'] += 1
+    
+    # Log usage at intervals
+    if rpc_calls_today['count'] % 1000 == 0:
+        logger.info(f"📊 RPC calls today: {rpc_calls_today['count']}")
+        
+    for attempt in range(max_retries):
+        try:
+            with w3_lock:
+                return func(*args, **kwargs)
+        except Exception as e:
+            error_str = str(e).lower()
+            # Enhanced rate limit detection for Infura
+            if any(term in error_str for term in [
+                '429', 'rate limit', 'too many requests', 'quota exceeded',
+                'request limit', 'throttled', 'rate exceeded',
+                'daily request count exceeded', 'project id request limit'  # Infura specific
+            ]):
+                # Exponential backoff for rate limits
+                wait_time = min(600, Config.RATE_LIMIT_COOLDOWN * (2 ** attempt))
+                logger.warning(f"🚫 Infura rate limit hit, waiting {wait_time}s...")
+                time.sleep(wait_time)
+            elif any(term in error_str for term in [
+                'connection', 'timeout', 'network', 'unreachable'
+            ]):
+                logger.warning(f"Network error (attempt {attempt + 1}): {e}")
+                time.sleep(Config.WEB3_RETRY_DELAY * (attempt + 1))
+            elif attempt == max_retries - 1:
+                logger.error(f"Web3 call failed after {max_retries} attempts: {e}")
+                raise
+            else:
+                logger.warning(f"Web3 call failed (attempt {attempt + 1}): {e}")
+                time.sleep(Config.WEB3_RETRY_DELAY)
+
 # ---------------- UTILS ---------------- #
 def build_frictionless_message(tx_type, token_symbol, value, tx_hash, address):
     """Build formatted message for Frictionless platform notifications"""
@@ -111,7 +187,7 @@ def build_frictionless_message(tx_type, token_symbol, value, tx_hash, address):
     return None
 
 def notify(message, tx_type=None):
-    """Send notification to all configured Telegram chats"""
+    """Send notification to all configured Telegram chats with improved error handling"""
     video_path = 'Friccy_whale.gif'
     
     # Create appropriate keyboard based on transaction type
@@ -125,39 +201,96 @@ def notify(message, tx_type=None):
     reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
 
     for chat_id in TELEGRAM_CHAT_IDS:
-        # Send animation with retries
-        for attempt in range(3):
-            try:
-                if os.path.exists(video_path):
-                    with open(video_path, 'rb') as gif_file:
-                        bot.send_animation(chat_id=chat_id, animation=gif_file, timeout=10)
-                break
-            except Exception as e:
-                logger.warning(f"Attempt {attempt + 1} failed to send animation to {chat_id}: {e}")
-                if attempt < 2:
-                    time.sleep(2)
+        # Send animation with improved error handling
+        _send_animation_with_retry(chat_id, video_path)
         
-        # Send message with retries
-        for attempt in range(3):
-            try:
-                bot.send_message(
-                    chat_id=chat_id, 
-                    text=message, 
-                    parse_mode='Markdown', 
-                    reply_markup=reply_markup, 
-                    timeout=10
-                )
-                break
-            except Exception as e:
-                logger.warning(f"Attempt {attempt + 1} failed to send message to {chat_id}: {e}")
-                if attempt < 2:
-                    time.sleep(2)
-        else:
-            logger.error(f"❌ All retries failed for message to chat_id {chat_id}")
+        # Send message with improved error handling
+        _send_message_with_retry(chat_id, message, reply_markup)
 
-def process_erc20_transfer(log, tx_hash):
+def _send_animation_with_retry(chat_id, video_path):
+    """Helper function to send animation with proper error handling"""
+    if not os.path.exists(video_path):
+        logger.warning(f"Animation file not found: {video_path}")
+        return
+        
+    for attempt in range(Config.MAX_RETRIES):
+        try:
+            with open(video_path, 'rb') as gif_file:
+                bot.send_animation(
+                    chat_id=chat_id, 
+                    animation=gif_file, 
+                    timeout=Config.TELEGRAM_TIMEOUT
+                )
+            logger.debug(f"Animation sent successfully to {chat_id}")
+            return
+            
+        except RetryAfter as e:
+            logger.warning(f"Telegram rate limit (animation), retrying in {e.retry_after}s...")
+            time.sleep(e.retry_after)
+        except Exception as e:
+            logger.warning(f"Attempt {attempt+1} failed to send animation to {chat_id}: {e}")
+            if attempt < Config.MAX_RETRIES - 1:
+                time.sleep(Config.TELEGRAM_RETRY_DELAY)
+    
+    logger.error(f"❌ Failed to send animation to chat_id {chat_id} after {Config.MAX_RETRIES} attempts")
+
+def _send_message_with_retry(chat_id, message, reply_markup):
+    """Helper function to send message with proper error handling"""
+    for attempt in range(Config.MAX_RETRIES):
+        try:
+            bot.send_message(
+                chat_id=chat_id,
+                text=message,
+                parse_mode='Markdown',
+                reply_markup=reply_markup,
+                timeout=Config.TELEGRAM_TIMEOUT
+            )
+            logger.debug(f"Message sent successfully to {chat_id}")
+            return
+            
+        except RetryAfter as e:
+            logger.warning(f"Telegram rate limit (message), retrying in {e.retry_after}s...")
+            time.sleep(e.retry_after)
+        except Exception as e:
+            logger.warning(f"Attempt {attempt+1} failed to send message to {chat_id}: {e}")
+            if attempt < Config.MAX_RETRIES - 1:
+                time.sleep(Config.TELEGRAM_RETRY_DELAY)
+    
+    logger.error(f"❌ Failed to send message to chat_id {chat_id} after {Config.MAX_RETRIES} attempts")
+
+# ---------------- TOKEN INFO CACHING SYSTEM ---------------- #
+def get_cached_token_info(contract_address):
+    """Get cached token info to avoid repeat RPC calls"""
+    global TOKEN_CACHE
+    
+    if contract_address in TOKEN_CACHE:
+        return TOKEN_CACHE[contract_address]
+    
+    try:
+        contract = w3.eth.contract(address=contract_address, abi=ERC20_ABI)
+        symbol = safe_web3_call(contract.functions.symbol().call)
+        decimals = safe_web3_call(contract.functions.decimals().call)
+        
+        # Cache the result
+        TOKEN_CACHE[contract_address] = {'symbol': symbol, 'decimals': decimals}
+        logger.debug(f"Cached token info for {contract_address}: {symbol}")
+        return TOKEN_CACHE[contract_address]
+    except Exception:
+        # Cache the failure too to avoid repeat attempts
+        TOKEN_CACHE[contract_address] = {'symbol': 'UNKNOWN', 'decimals': 18}
+        logger.debug(f"Cached failed token lookup for {contract_address}")
+        return TOKEN_CACHE[contract_address]
+
+def get_cached_token_symbol(contract_address):
+    """Get token symbol with aggressive caching"""
+    return get_cached_token_info(contract_address)['symbol']
+
+def get_cached_token_decimals(contract_address):
+    """Get token decimals with aggressive caching"""
+    return get_cached_token_info(contract_address)['decimals']
     """Process ERC20 transfer events from transaction logs"""
     try:
+        # Use safe_web3_call for contract interactions
         contract = w3.eth.contract(address=log['address'], abi=ERC20_ABI)
         from web3._utils.events import get_event_data
         
@@ -183,14 +316,14 @@ def process_erc20_transfer(log, tx_hash):
         else:
             return False
 
-        # Get token info
+        # Get token info using safe wrapper
         try:
-            token_symbol = contract.functions.symbol().call()
+            token_symbol = safe_web3_call(contract.functions.symbol().call)
         except Exception:
             token_symbol = "UNKNOWN"
 
         try:
-            decimals = contract.functions.decimals().call()
+            decimals = safe_web3_call(contract.functions.decimals().call)
         except Exception:
             decimals = 18
 
@@ -239,11 +372,16 @@ def process_eth_transfer(tx):
     
     return False
 
-# ---------------- MAIN LOGIC ---------------- #
+# ---------------- IMPROVED MAIN LOGIC ---------------- #
 def check_blocks():
     """Main function to check new blocks for relevant transactions"""
     global last_checked
-    latest = w3.eth.block_number
+    
+    try:
+        latest = safe_web3_call(lambda: w3.eth.block_number)
+    except Exception as e:
+        logger.error(f"Failed to get latest block number: {e}")
+        return
     
     if latest <= last_checked:
         return
@@ -252,57 +390,62 @@ def check_blocks():
 
     for block_number in range(last_checked + 1, latest + 1):
         try:
-            block = w3.eth.get_block(block_number, full_transactions=True)
-            
-            for tx in block.transactions:
-                if not tx['to'] and not tx['from']:
-                    continue
-
-                to_address = w3.to_checksum_address(tx['to']) if tx['to'] else None
-                from_address = w3.to_checksum_address(tx['from']) if tx['from'] else None
-
-                # Skip if transaction doesn't involve tracked wallets
-                if (to_address not in WALLETS_TO_TRACK and 
-                    from_address not in WALLETS_TO_TRACK):
-                    continue
-
-                try:
-                    receipt = w3.eth.get_transaction_receipt(tx.hash)
-                    found_token_transfer = False
-
-                    # Check for ERC20 transfers in transaction logs
-                    for log in receipt.logs:
-                        if (len(log['topics']) == 3 and 
-                            log['topics'][0].hex() == transfer_event_sig):
-                            if process_erc20_transfer(log, tx.hash.hex()):
-                                found_token_transfer = True
-
-                    # If no ERC20 transfers found, check for ETH transfer
-                    if not found_token_transfer:
-                        process_eth_transfer(tx)
-
-                except Exception as e:
-                    if '429' in str(e):
-                        logger.warning("Rate limited by RPC provider. Cooling down for 120 seconds.")
-                        time.sleep(120)
-                    else:
-                        logger.error(f"Transaction processing error: {e}")
-
+            process_block(block_number)
         except Exception as e:
             logger.error(f"Block processing error for block {block_number}: {e}")
+            # Continue processing other blocks even if one fails
 
     last_checked = latest
 
-# ---------------- CAMPAIGN SUMMARY ---------------- #
-# Cache for ETH price to avoid rate limiting
-eth_price_cache = {'price': 0, 'timestamp': 0}
-PRICE_CACHE_DURATION = 300  # 5 minutes
+def process_block(block_number):
+    """Process a single block for relevant transactions"""
+    try:
+        block = safe_web3_call(lambda: w3.eth.get_block(block_number, full_transactions=True))
+        
+        for tx in block.transactions:
+            if not tx['to'] and not tx['from']:
+                continue
 
+            to_address = w3.to_checksum_address(tx['to']) if tx['to'] else None
+            from_address = w3.to_checksum_address(tx['from']) if tx['from'] else None
+
+            # Skip if transaction doesn't involve tracked wallets
+            if (to_address not in WALLETS_TO_TRACK and 
+                from_address not in WALLETS_TO_TRACK):
+                continue
+
+            process_transaction(tx)
+                
+    except Exception as e:
+        logger.error(f"Error processing block {block_number}: {e}")
+        raise
+
+def process_transaction(tx):
+    """Process a single transaction for token transfers and ETH transfers"""
+    try:
+        receipt = safe_web3_call(lambda: w3.eth.get_transaction_receipt(tx.hash))
+        found_token_transfer = False
+
+        # Check for ERC20 transfers in transaction logs
+        for log in receipt.logs:
+            if (len(log['topics']) == 3 and 
+                log['topics'][0].hex() == transfer_event_sig):
+                if process_erc20_transfer(log, tx.hash.hex()):
+                    found_token_transfer = True
+
+        # If no ERC20 transfers found, check for ETH transfer
+        if not found_token_transfer:
+            process_eth_transfer(tx)
+            
+    except Exception as e:
+        logger.error(f"Transaction processing error for {tx.hash.hex()}: {e}")
+
+# ---------------- IMPROVED CAMPAIGN SUMMARY ---------------- #
 def get_eth_price():
     """Get ETH price with caching and multiple fallbacks"""
     global eth_price_cache
     
-    # Use static price if configured (useful for testing)
+    # Use static price if configured
     if STATIC_ETH_PRICE:
         try:
             static_price = float(STATIC_ETH_PRICE)
@@ -312,11 +455,31 @@ def get_eth_price():
             logger.warning(f"Invalid STATIC_ETH_PRICE value: {STATIC_ETH_PRICE}")
     
     # Return cached price if still valid
-    if (time.time() - eth_price_cache['timestamp']) < PRICE_CACHE_DURATION:
+    if (time.time() - eth_price_cache['timestamp']) < Config.PRICE_CACHE_DURATION:
         logger.debug(f"Using cached ETH price: ${eth_price_cache['price']}")
         return eth_price_cache['price']
     
-    # Try multiple price sources
+    # Try to get fresh price
+    price = fetch_eth_price_from_apis()
+    
+    if price > 0:
+        # Update cache
+        eth_price_cache = {
+            'price': price,
+            'timestamp': time.time()
+        }
+        return price
+    
+    # Return cached price even if expired, or 0 if no cache
+    if eth_price_cache['price'] > 0:
+        logger.warning("Using expired cached ETH price")
+        return eth_price_cache['price']
+    
+    logger.error("Could not fetch ETH price from any source")
+    return 0
+
+def fetch_eth_price_from_apis():
+    """Fetch ETH price from multiple API sources"""
     price_sources = [
         {
             'name': 'CoinGecko',
@@ -352,34 +515,23 @@ def get_eth_price():
                 price = source['parser'](price_data)
                 
                 if price > 0:
-                    # Update cache
-                    eth_price_cache = {
-                        'price': price,
-                        'timestamp': time.time()
-                    }
                     logger.info(f"ETH price updated from {source['name']}: ${price}")
                     return price
                     
         except Exception as e:
             logger.warning(f"Failed to get price from {source['name']}: {e}")
     
-    # Return cached price even if expired, or 0 if no cache
-    if eth_price_cache['price'] > 0:
-        logger.warning("Using expired cached ETH price")
-        return eth_price_cache['price']
-    
-    logger.error("Could not fetch ETH price from any source")
     return 0
-
-# ----------------- Send campaign Summary -------------- #
-#Enhanced chart creation with background image support
 
 def create_enhanced_progress_chart(bal_eth, current_usd, percent):
     """Create progress chart with optional background image"""
     import numpy as np
+    import matplotlib.pyplot as plt
     from matplotlib.colors import LinearSegmentedColormap
     import matplotlib.image as mpimg
+    from matplotlib import patheffects as path_effects
     from PIL import Image, ImageFilter, ImageEnhance
+    import os
     
     # Create figure
     fig, ax = plt.subplots(figsize=(12, 4), facecolor='#1a1a1a')
@@ -407,7 +559,7 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
             ax.imshow(bg_array, extent=[-2, 102, -1, 1.5], aspect='auto', alpha=0.6)
             
         except Exception as e:
-            print(f"Could not load background image: {e}")
+            logger.warning(f"Could not load background image: {e}")
     
     # METHOD 2: Create a gradient background programmatically
     else:
@@ -475,41 +627,41 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
                    color=colors[0], alpha=glow_alpha, 
                    edgecolor='none', zorder=1)
     
-    # Shimmer effect removed to prevent text overlap
-# The gradient and glow effects provide sufficient visual appeal
-    
-# Outlined Text Function
-
-    def add_outlined_text(x, y, text, fontsize, color='white', outline_color='black'):
-        # Draw black outline (multiple offset positions)
-        for dx in [-0.05, 0, 0.05]:
-            for dy in [-0.05, 0, 0.05]:
-                if dx != 0 or dy != 0:  # Skip center
-                    ax.text(x + dx, y + dy, text, ha='center', va='center', 
-                           fontsize=fontsize, color=outline_color, fontweight='bold', zorder=5)
+    # Outlined Text Function
+    def add_outlined_text_v2(x, y, text, fontsize, color='white', outline_color='black', outline_width=3):
+        """Add text with outline using path effects (more efficient)"""
+        text_obj = ax.text(x, y, text, ha='center', va='center', fontsize=fontsize, 
+                          color=color, fontweight='bold', zorder=6)
         
-        # Draw main text on top
-        ax.text(x, y, text, ha='center', va='center', fontsize=fontsize, 
-               color=color, fontweight='bold', zorder=6)
-    
-    # Add percentage text on the bar with outline
+        # Add stroke/outline effect
+        text_obj.set_path_effects([
+            path_effects.Stroke(linewidth=outline_width, foreground=outline_color),
+            path_effects.Normal()
+        ])
+        
+        return text_obj
+
+    # Usage - replace your title line with:
+    add_outlined_text_v2(50, bar_y + 1.9, 'Frictionless Fundraising Progress', 20, 
+                        color='#ffffff', outline_color='black', outline_width=4)
+
+    # For other text elements:
     if percent > 10:
-        add_outlined_text(percent/2, bar_y, f'{percent:.1f}%', 16)
+        add_outlined_text_v2(percent/2, bar_y, f'{percent:.1f}%', 16, outline_width=3)
     else:
-        add_outlined_text(percent + 8, bar_y, f'{percent:.1f}%', 16)
+        add_outlined_text_v2(percent + 8, bar_y, f'{percent:.1f}%', 16, outline_width=3)
     
     # Add value labels with outline - ADJUSTED POSITIONS
-    add_outlined_text(5, bar_y - .4, f'${current_usd:,.0f}', 14, color='#cccccc')  # Moved up from -1.2
-    add_outlined_text(95, bar_y - .4, f'${CAMPAIGN_TARGET_USD:,.0f}', 14, color='#cccccc') # Moved up from -1.2
-    
-    # Add title with outline - ADJUSTED POSITION  
-    add_outlined_text(50, bar_y + 1.9, 'Fundraising Progress', 20, color='#ffffff')
+    add_outlined_text_v2(5, bar_y - .4, f'${current_usd:,.0f}', 14, 
+                        color='#cccccc', outline_color='black', outline_width=4)
+    add_outlined_text_v2(95, bar_y - .4, f'${CAMPAIGN_TARGET_USD:,.0f}', 14, 
+                        color='#cccccc', outline_color='black', outline_width=4)
     
     # Add decorative elements - REDUCED OPACITY
     # Corner decorations
     corner_size = 3
     ax.plot([102-corner_size, 102, 102], [1.5-corner_size, 1.5-corner_size, 1.5], 
-           color=colors[0], linewidth=3, alpha=0.4, zorder=6)  # Reduced from 0.7
+           color=colors[0], linewidth=3, alpha=0.4, zorder=6)
     ax.plot([-2, -2, -2+corner_size], [1.5, 1.5-corner_size, 1.5-corner_size], 
            color=colors[0], linewidth=3, alpha=0.4, zorder=6)
     ax.plot([-2, -2, -2+corner_size], [-1, -1+corner_size, -1+corner_size], 
@@ -523,20 +675,20 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
     ax.axis('off')
     
     return fig
-    
-    return fig
 
-# Modified send_campaign_summary function
 def send_campaign_summary():
-    """Send periodic fundraising campaign updates with enhanced visuals"""
+    """Send periodic fundraising campaign updates with enhanced visuals and proper cleanup"""
+    img_path = None
+    fig = None
+    
     try:
-        # ... (validation code remains the same) ...
-        
+        # Validation
         if not CAMPAIGN_ADDRESS or not w3.is_address(CAMPAIGN_ADDRESS):
             logger.error("Invalid campaign address")
             return
 
-        bal_wei = w3.eth.get_balance(CAMPAIGN_ADDRESS)
+        # Get balance using safe wrapper
+        bal_wei = safe_web3_call(lambda: w3.eth.get_balance(CAMPAIGN_ADDRESS))
         bal_eth = w3.from_wei(bal_wei, 'ether')
         
         price_usd = get_eth_price()
@@ -547,22 +699,8 @@ def send_campaign_summary():
         current_usd = float(bal_eth) * price_usd
         percent = min(100, (current_usd / CAMPAIGN_TARGET_USD) * 100)
 
-        # Status message logic (same as before)
-        if percent >= 100:
-            status_emoji = "🎉"
-            status_text = "GOAL ACHIEVED!"
-        elif percent >= 75:
-            status_emoji = "🔥"
-            status_text = "Almost There!"
-        elif percent >= 50:
-            status_emoji = "📈"
-            status_text = "Halfway Mark!"
-        elif percent >= 25:
-            status_emoji = "💪"
-            status_text = "Building Momentum"
-        else:
-            status_emoji = "🚀"
-            status_text = "Getting Started"
+        # Status message logic
+        status_emoji, status_text = get_status_emoji_and_text(percent)
 
         msg = (
             f"{status_emoji} *{status_text}*\n\n"
@@ -574,64 +712,117 @@ def send_campaign_summary():
         keyboard = [[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/contribute")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        # USE THE NEW ENHANCED CHART FUNCTION
+        # Create chart
         fig = create_enhanced_progress_chart(bal_eth, current_usd, percent)
         
         # Save with high quality
         img_path = '/tmp/progress_enhanced.png'
-        fig.savefig(img_path, bbox_inches='tight', dpi=200, 
+        fig.savefig(img_path, bbox_inches='tight', dpi=Config.IMAGE_DPI, 
                    facecolor='#1a1a1a', edgecolor='none', 
                    transparent=False, pad_inches=0.2)
-        plt.close(fig)
 
         # Send to all Telegram chats
-        for chat_id in TELEGRAM_CHAT_IDS:
-            try:
-                with open(img_path, 'rb') as img_file:
-                    bot.send_photo(chat_id=chat_id, photo=img_file, timeout=15)
-                bot.send_message(chat_id=chat_id, text=msg, parse_mode='Markdown', 
-                               reply_markup=reply_markup, timeout=10)
-            except Exception as e:
-                logger.error(f"Failed to send campaign update to {chat_id}: {e}")
+        send_campaign_to_chats(img_path, msg, reply_markup)
                 
-        # Clean up
-        try:
-            os.remove(img_path)
-        except Exception:
-            pass
-            
     except Exception as e:
         logger.error(f"Error in send_campaign_summary: {e}")
+    finally:
+        # Cleanup resources
+        if fig:
+            plt.close(fig)
+        if img_path and os.path.exists(img_path):
+            try:
+                os.remove(img_path)
+            except Exception as e:
+                logger.warning(f"Failed to cleanup image file: {e}")
 
-# ---------------- BACKGROUND THREADS ---------------- #
+def get_status_emoji_and_text(percent):
+    """Get appropriate emoji and status text based on progress percentage"""
+    if percent >= 100:
+        return "🎉", "GOAL ACHIEVED!"
+    elif percent >= 75:
+        return "🔥", "Almost There!"
+    elif percent >= 50:
+        return "📈", "Halfway Mark!"
+    elif percent >= 25:
+        return "💪", "Building Momentum"
+    else:
+        return "🚀", "Getting Started"
+
+def send_campaign_to_chats(img_path, msg, reply_markup):
+    """Send campaign update to all configured chats with better error handling"""
+    for chat_id in TELEGRAM_CHAT_IDS:
+        try:
+            # Send image
+            with open(img_path, 'rb') as img_file:
+                bot.send_photo(
+                    chat_id=chat_id, 
+                    photo=img_file, 
+                    timeout=Config.TELEGRAM_TIMEOUT
+                )
+            
+            # Send message
+            bot.send_message(
+                chat_id=chat_id, 
+                text=msg, 
+                parse_mode='Markdown', 
+                reply_markup=reply_markup, 
+                timeout=Config.TELEGRAM_TIMEOUT
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to send campaign update to {chat_id}: {e}")
+
+# ---------------- IMPROVED BACKGROUND THREADS ---------------- #
 def run_scanner():
-    """Background thread for blockchain scanning"""
+    """Background thread for blockchain scanning with better error handling"""
     logger.info("✅ Scanner thread started")
+    consecutive_errors = 0
+    
     while True:
         try:
             check_blocks()
-            time.sleep(60)  # Check every minute
+            consecutive_errors = 0  # Reset error counter on success
+            time.sleep(Config.BLOCK_CHECK_INTERVAL)
+            
         except Exception as e:
-            logger.error(f"🔥 Scanner loop error: {repr(e)}")
-            time.sleep(30)  # Wait before retrying
+            consecutive_errors += 1
+            logger.error(f"🔥 Scanner loop error ({consecutive_errors}/{Config.SCANNER_MAX_CONSECUTIVE_ERRORS}): {repr(e)}")
+            
+            if consecutive_errors >= Config.SCANNER_MAX_CONSECUTIVE_ERRORS:
+                logger.critical("Too many consecutive scanner errors. Extending sleep time.")
+                time.sleep(Config.SCANNER_EXTENDED_SLEEP)
+                consecutive_errors = 0  # Reset counter
+            else:
+                time.sleep(Config.SCANNER_ERROR_SLEEP)
 
 def run_summary():
-    """Background thread for periodic fundraising summaries"""
+    """Background thread for periodic fundraising summaries with better error handling"""
     if not ENABLE_CAMPAIGN_SUMMARY:
         logger.info("📊 Campaign summary disabled via ENABLE_CAMPAIGN_SUMMARY")
         return
         
     logger.info(f"✅ Summary thread started - interval: {SUMMARY_INTERVAL_MINUTES} minutes")
     interval_seconds = SUMMARY_INTERVAL_MINUTES * 60
+    consecutive_errors = 0
     
     while True:
         try:
             send_campaign_summary()
+            consecutive_errors = 0  # Reset error counter on success
             logger.info(f"Next campaign summary in {SUMMARY_INTERVAL_MINUTES} minutes")
             time.sleep(interval_seconds)
+            
         except Exception as e:
-            logger.error(f"Summary thread error: {e}")
-            time.sleep(600)  # Wait 10 minutes before retrying
+            consecutive_errors += 1
+            logger.error(f"Summary thread error ({consecutive_errors}/{Config.SUMMARY_MAX_CONSECUTIVE_ERRORS}): {e}")
+            
+            if consecutive_errors >= Config.SUMMARY_MAX_CONSECUTIVE_ERRORS:
+                logger.warning("Too many consecutive summary errors. Extending sleep time.")
+                time.sleep(Config.SUMMARY_EXTENDED_SLEEP)
+                consecutive_errors = 0  # Reset counter
+            else:
+                time.sleep(Config.SUMMARY_RETRY_SLEEP)
 
 # ---------------- TELEGRAM COMMANDS ---------------- #
 def start_command(update: Update, context: CallbackContext):
@@ -639,15 +830,24 @@ def start_command(update: Update, context: CallbackContext):
     update.message.reply_text("🚀 Frictionless bot is live and tracking blocks.")
 
 def status_command(update: Update, context: CallbackContext):
-    """Handle /status command"""
+    """Handle /status command with performance metrics"""
     try:
-        block = w3.eth.block_number
+        block = safe_web3_call(lambda: w3.eth.block_number)
         connection_status = "✅ Connected" if w3.is_connected() else "❌ Disconnected"
-        update.message.reply_text(
-            f"📡 Bot Status: {connection_status}\n"
-            f"Current block: {block:,}\n"
-            f"Last checked: {last_checked:,}"
+        blocks_behind = block - last_checked
+        
+        status_text = (
+            f"📡 **Bot Status:** {connection_status}\n"
+            f"🔗 **Current block:** `{block:,}`\n"
+            f"🔍 **Last checked:** `{last_checked:,}`\n"
+            f"📊 **Blocks behind:** `{blocks_behind}`\n\n"
+            f"📈 **Performance:**\n"
+            f"• Daily RPC calls: `{rpc_calls_today['count']:,}`\n"
+            f"• Cached tokens: `{len(TOKEN_CACHE)}`\n"
+            f"• Blocks processed: `{blocks_processed_count:,}`"
         )
+        
+        update.message.reply_text(status_text, parse_mode='Markdown')
     except Exception as e:
         update.message.reply_text(f"❌ Error checking status: {str(e)}")
 
@@ -671,34 +871,44 @@ def uptime_command(update: Update, context: CallbackContext):
 
 def config_command(update: Update, context: CallbackContext):
     """Handle /config command - show current configuration"""
-    # Determine price mode text
-    if STATIC_ETH_PRICE:
-        try:
-            static_price = float(STATIC_ETH_PRICE)
-            price_mode = f"Static (${static_price})`"
-        except ValueError:
-            price_mode = f"Invalid static price: {STATIC_ETH_PRICE}`"
-    else:
-        price_mode = "Dynamic pricing`"
-    
-    config_text = (
-        "*Bot Configuration:*\n\n"
-        f"🔗 **Blockchain:**\n"
-        f"• Network: Ethereum\n"
-        f"• Current Block: `{w3.eth.block_number if w3.is_connected() else 'disconnected'}`\n"
-        f"• Last Checked: `{last_checked}`\n\n"
-        f"👥 **Telegram:**\n"
-        f"• Chat IDs: `{len(TELEGRAM_CHAT_IDS)} configured`\n\n"
-        f"💰 **Campaign:**\n"
-        f"• Address: `{CAMPAIGN_ADDRESS[:10]}...{CAMPAIGN_ADDRESS[-8:] if CAMPAIGN_ADDRESS else 'Not set'}`\n"
-        f"• Target: `${CAMPAIGN_TARGET_USD:,.2f}`\n"
-        f"• Summary Enabled: `{ENABLE_CAMPAIGN_SUMMARY}`\n"
-        f"• Summary Interval: `{SUMMARY_INTERVAL_MINUTES} minutes`\n\n"
-        f"🔍 **Tracking:**\n"
-        f"• Wallets: `{len(WALLETS_TO_TRACK)} addresses`\n"
-        f"• Price Mode: `{price_mode}"
-    )
-    update.message.reply_text(config_text, parse_mode='Markdown')
+    try:
+        # Use safe_web3_call for getting block number
+        current_block = safe_web3_call(lambda: w3.eth.block_number) if w3.is_connected() else 'disconnected'
+        
+        # Determine price mode text
+        if STATIC_ETH_PRICE:
+            try:
+                static_price = float(STATIC_ETH_PRICE)
+                price_mode = f"Static (${static_price})`"
+            except ValueError:
+                price_mode = f"Invalid static price: {STATIC_ETH_PRICE}`"
+        else:
+            price_mode = "Dynamic pricing`"
+        
+        # Safely display chat count without exposing IDs
+        chat_count = len(TELEGRAM_CHAT_IDS)
+        chat_status = f"{chat_count} configured"
+        
+        config_text = (
+            "*Bot Configuration:*\n\n"
+            f"🔗 **Blockchain:**\n"
+            f"• Network: Ethereum\n"
+            f"• Current Block: `{current_block}`\n"
+            f"• Last Checked: `{last_checked}`\n\n"
+            f"👥 **Telegram:**\n"
+            f"• Chat IDs: `{chat_status}`\n\n"
+            f"💰 **Campaign:**\n"
+            f"• Address: `{CAMPAIGN_ADDRESS[:10]}...{CAMPAIGN_ADDRESS[-8:] if CAMPAIGN_ADDRESS else 'Not set'}`\n"
+            f"• Target: `${CAMPAIGN_TARGET_USD:,.2f}`\n"
+            f"• Summary Enabled: `{ENABLE_CAMPAIGN_SUMMARY}`\n"
+            f"• Summary Interval: `{SUMMARY_INTERVAL_MINUTES} minutes`\n\n"
+            f"🔍 **Tracking:**\n"
+            f"• Wallets: `{len(WALLETS_TO_TRACK)} addresses`\n"
+            f"• Price Mode: `{price_mode}"
+        )
+        update.message.reply_text(config_text, parse_mode='Markdown')
+    except Exception as e:
+        update.message.reply_text(f"❌ Error getting configuration: {str(e)}")
 
 def commands_command(update: Update, context: CallbackContext):
     """Handle /commands command"""
@@ -728,8 +938,8 @@ def campaign_command(update: Update, context: CallbackContext):
             update.message.reply_text("❌ Invalid campaign address configured")
             return
 
-        # Get campaign balance
-        bal_wei = w3.eth.get_balance(CAMPAIGN_ADDRESS)
+        # Get campaign balance using safe wrapper
+        bal_wei = safe_web3_call(lambda: w3.eth.get_balance(CAMPAIGN_ADDRESS))
         bal_eth = w3.from_wei(bal_wei, 'ether')
         
         # Get ETH price
@@ -742,27 +952,12 @@ def campaign_command(update: Update, context: CallbackContext):
         current_usd = float(bal_eth) * price_usd
         percent = min(100, (current_usd / CAMPAIGN_TARGET_USD) * 100)
 
-        # Build visual progress bar (same logic as send_campaign_summary)
+        # Build visual progress bar
         progress_blocks = "█" * int(percent // 4) + "░" * (25 - int(percent // 4))
         
         # Choose emoji and status text based on progress
-        if percent >= 100:
-            status_emoji = "🎉"
-            status_text = "GOAL ACHIEVED!"
-        elif percent >= 75:
-            status_emoji = "🔥"
-            status_text = "Almost There!"
-        elif percent >= 50:
-            status_emoji = "📈"
-            status_text = "Halfway Mark!"
-        elif percent >= 25:
-            status_emoji = "💪"
-            status_text = "Building Momentum"
-        else:
-            status_emoji = "🚀"
-            status_text = "Getting Started"
+        status_emoji, status_text = get_status_emoji_and_text(percent)
 
-        # FIXED: Remove the inline button from message text
         status_msg = (
             f"{status_emoji} *{status_text}*\n\n"
             f"💰 **Balance:** `{bal_eth:.4f} ETH`\n"
@@ -796,12 +991,21 @@ def help_command(update: Update, context: CallbackContext):
 @app.route('/', methods=['GET'])
 def home():
     """Health check endpoint"""
-    return {
-        'status': 'running',
-        'uptime_seconds': int(time.time() - start_time),
-        'last_checked_block': last_checked,
-        'current_block': w3.eth.block_number if w3.is_connected() else 'disconnected'
-    }
+    try:
+        current_block = safe_web3_call(lambda: w3.eth.block_number) if w3.is_connected() else 'disconnected'
+        return {
+            'status': 'running',
+            'uptime_seconds': int(time.time() - start_time),
+            'last_checked_block': last_checked,
+            'current_block': current_block
+        }
+    except Exception as e:
+        return {
+            'status': 'error',
+            'error': str(e),
+            'uptime_seconds': int(time.time() - start_time),
+            'last_checked_block': last_checked
+        }
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
