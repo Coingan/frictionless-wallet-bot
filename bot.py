@@ -463,6 +463,8 @@ def check_blocks():
 
 def process_block(block_number):
     """Process a single block for relevant transactions"""
+    global blocks_processed_count
+    
     try:
         block = safe_web3_call(lambda: w3.eth.get_block(block_number, full_transactions=True))
         
@@ -479,6 +481,9 @@ def process_block(block_number):
                 continue
 
             process_transaction(tx)
+        
+        # Increment blocks processed counter
+        blocks_processed_count += 1
                 
     except Exception as e:
         logger.error(f"Error processing block {block_number}: {e}")
@@ -881,19 +886,27 @@ def start_command(update: Update, context: CallbackContext):
 def status_command(update: Update, context: CallbackContext):
     """Handle /status command with performance metrics"""
     try:
-        block = safe_web3_call(lambda: w3.eth.block_number)
+        current_block = safe_web3_call(lambda: w3.eth.block_number)
         connection_status = "✅ Connected" if w3.is_connected() else "❌ Disconnected"
-        blocks_behind = block - last_checked
+        blocks_behind = current_block - last_checked
+        
+        # Calculate uptime
+        uptime_seconds = int(time.time() - start_time)
+        hours, remainder = divmod(uptime_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        uptime_str = f"{hours}h {minutes}m {seconds}s"
         
         status_text = (
             f"📡 **Bot Status:** {connection_status}\n"
-            f"🔗 **Current block:** `{block:,}`\n"
+            f"⏱ **Uptime:** `{uptime_str}`\n"
+            f"🔗 **Current block:** `{current_block:,}`\n"
             f"🔍 **Last checked:** `{last_checked:,}`\n"
             f"📊 **Blocks behind:** `{blocks_behind}`\n\n"
             f"📈 **Performance:**\n"
             f"• Daily RPC calls: `{rpc_calls_today['count']:,}`\n"
             f"• Cached tokens: `{len(TOKEN_CACHE)}`\n"
-            f"• Blocks processed: `{blocks_processed_count:,}`"
+            f"• Blocks processed: `{blocks_processed_count:,}`\n"
+            f"• Scan interval: `{Config.BLOCK_CHECK_INTERVAL}s`"
         )
         
         update.message.reply_text(status_text, parse_mode='Markdown')
@@ -968,6 +981,7 @@ def commands_command(update: Update, context: CallbackContext):
         "`/config` - Show bot configuration\n"
         "`/campaign` - Show current campaign status\n"
         "`/switches` - List all tracked wallet addresses\n"
+        "`/staking` - Get Frictionless staking link\n"
         "`/uptime` - Show bot uptime\n"
         "`/help` - Link to Frictionless Platform User Guide\n"
         "`/commands` - List all available commands"
@@ -1027,12 +1041,21 @@ def campaign_command(update: Update, context: CallbackContext):
         logger.error(f"Error in campaign_command: {e}")
         update.message.reply_text(f"❌ Error fetching campaign status: {str(e)}")
 
+def staking_command(update: Update, context: CallbackContext):
+    """Handle /staking command"""
+    staking_text = (
+        "💰 *Stake your Frictionless tokens here!*\n\n"
+        "🔗 https://app.altctrl.com/tokens/frictionless/farms/0xA7535B1820c1a0C8680e33E208438058F244B856"
+    )
+    update.message.reply_text(staking_text, parse_mode='Markdown')
+
 def help_command(update: Update, context: CallbackContext):
     """Handle /help command"""
     help_text = (
         "📚 *Frictionless Platform Help*\n\n"
         "🔗 [User Guide](https://frictionless-2.gitbook.io/http-www.frictionless.help)\n"
-        "💬 For support, contact the development team."
+        "💬 For further support, please submit a ticket through our official Discord\n."
+        "👉 https://discord.gg/kJRk4vFUeZ"
     )
     update.message.reply_text(help_text, parse_mode='Markdown')
 
@@ -1084,6 +1107,7 @@ dispatcher.add_handler(CommandHandler("status", status_command))
 dispatcher.add_handler(CommandHandler("config", config_command))
 dispatcher.add_handler(CommandHandler("campaign", campaign_command))
 dispatcher.add_handler(CommandHandler("switches", switches_command))
+dispatcher.add_handler(CommandHandler("staking", staking_command))
 dispatcher.add_handler(CommandHandler("uptime", uptime_command))
 dispatcher.add_handler(CommandHandler("commands", commands_command))
 dispatcher.add_handler(CommandHandler("help", help_command))
