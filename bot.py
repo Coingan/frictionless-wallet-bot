@@ -244,9 +244,9 @@ def notify(message, tx_type=None):
     
     # Create appropriate keyboard based on transaction type
     if tx_type == "incoming":
-        keyboard = [[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/contribute")]]
+        keyboard = [[InlineKeyboardButton("💰 Contribute to Our Fundraise", url="https://app.frictionless.network/contribute")]]
     elif tx_type == "outgoing":
-        keyboard = [[InlineKeyboardButton("💰 Create an OTC offer", url="https://app.frictionless.network/create")]]
+        keyboard = [[InlineKeyboardButton("💰 Contribute to Our Fundraise", url="https://app.frictionless.network/contribute")]]
     else:
         keyboard = []
     
