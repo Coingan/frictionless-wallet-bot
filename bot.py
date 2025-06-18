@@ -624,7 +624,7 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
             
             # Convert to array and display
             bg_array = np.array(bg_img)
-            ax.imshow(bg_array, extent=[-2, 102, -1, 1.5], aspect='auto', alpha=0.6)
+            ax.imshow(bg_array, extent=[-2, 102, -1, 1.5], aspect='auto', alpha=1) #changed from 0.6
             
         except Exception as e:
             logger.warning(f"Could not load background image: {e}")
@@ -773,7 +773,7 @@ def send_campaign_summary():
         img_path = '/tmp/progress_enhanced.png'
         fig.savefig(img_path, bbox_inches='tight', dpi=Config.IMAGE_DPI, 
                    facecolor='#95C511', edgecolor='none', #changed face color from 1a1a1a
-                   transparent=False, pad_inches=0) #Reduced padding from .15
+                   transparent=True, pad_inches=0) #Reduced padding from .15
 
         # Send to all Telegram chats
         send_campaign_to_chats(img_path, msg, reply_markup)
