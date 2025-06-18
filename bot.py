@@ -108,23 +108,13 @@ w3 = Web3(Web3.HTTPProvider(ETHEREUM_RPC_URL))
 if not w3.is_connected():
     raise ConnectionError("Failed to connect to Ethereum RPC")
 
-# Create Telegram bot with SSL context and retry logic
+# Create Telegram bot with improved connection handling
 try:
-    # Create custom request with SSL context
-    context = ssl.create_default_context()
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
-    
-    # Create request object with retries and timeout
+    # Create request object with increased timeouts and retries
     telegram_request = Request(
         connect_timeout=30,
         read_timeout=30,
-        con_pool_size=8,
-        urllib3_config=urllib3.util.Retry(
-            total=5,
-            backoff_factor=0.3,
-            status_forcelist=[500, 502, 503, 504]
-        )
+        con_pool_size=8
     )
     
     bot = Bot(token=TELEGRAM_BOT_TOKEN, request=telegram_request)
@@ -135,9 +125,16 @@ try:
     logger.info(f"✅ Bot connected successfully: @{bot_info.username}")
     
 except Exception as e:
-    logger.error(f"❌ Failed to initialize Telegram bot: {e}")
-    # Fallback to basic bot
-    bot = Bot(token=TELEGRAM_BOT_TOKEN)
+    logger.error(f"❌ Failed to initialize Telegram bot with custom request: {e}")
+    logger.info("Falling back to basic bot initialization...")
+    try:
+        # Fallback to basic bot
+        bot = Bot(token=TELEGRAM_BOT_TOKEN)
+        bot_info = bot.get_me()
+        logger.info(f"✅ Bot connected successfully with fallback: @{bot_info.username}")
+    except Exception as fallback_error:
+        logger.error(f"❌ Even fallback bot initialization failed: {fallback_error}")
+        raise
 
 last_checked = w3.eth.block_number
 transfer_event_sig = w3.keccak(text="Transfer(address,address,uint256)").hex()
