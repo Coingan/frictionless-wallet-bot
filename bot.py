@@ -240,44 +240,44 @@ def build_frictionless_message(tx_type, token_symbol, value, tx_hash, address):
 
 def notify(message, tx_type=None):
     """Send notification to all configured Telegram chats with improved error handling"""
-    video_path = 'Friccy_whale.gif'
+    image_path = 'campaign.jpg'  # CHANGED: from video_path = 'Friccy_whale.gif'
     
     # Create appropriate keyboard based on transaction type
     if tx_type == "incoming":
-        keyboard = [[InlineKeyboardButton("💰 Contribute to Our Fundraise", url="https://app.frictionless.network/contribute")]]
+        keyboard = [[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/contribute")]]
     elif tx_type == "outgoing":
-        keyboard = [[InlineKeyboardButton("💰 Contribute to Our Fundraise", url="https://app.frictionless.network/contribute")]]
+        keyboard = [[InlineKeyboardButton("💰 Create an OTC offer", url="https://app.frictionless.network/create")]]
     else:
         keyboard = []
     
     reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
 
     for chat_id in TELEGRAM_CHAT_IDS:
-        # Send animation with improved error handling
-        _send_animation_with_retry(chat_id, video_path)
+        # Send image with improved error handling
+        _send_image_with_retry(chat_id, image_path)  # CHANGED: from _send_animation_with_retry
         
         # Send message with improved error handling
         _send_message_with_retry(chat_id, message, reply_markup)
 
-def _send_animation_with_retry(chat_id, video_path):
-    """Helper function to send animation with proper error handling"""
-    if not os.path.exists(video_path):
-        logger.warning(f"Animation file not found: {video_path}")
+def _send_image_with_retry(chat_id, image_path):  # CHANGED: function name and parameter
+    """Helper function to send image with proper error handling"""
+    if not os.path.exists(image_path):
+        logger.warning(f"Image file not found: {image_path}")  # CHANGED: message text
         return
         
     for attempt in range(Config.MAX_RETRIES):
         try:
-            with open(video_path, 'rb') as gif_file:
-                bot.send_animation(
+            with open(image_path, 'rb') as img_file:  # CHANGED: variable names
+                bot.send_photo(  # CHANGED: from send_animation
                     chat_id=chat_id, 
-                    animation=gif_file, 
+                    photo=img_file,  # CHANGED: from animation=gif_file
                     timeout=Config.TELEGRAM_TIMEOUT
                 )
-            logger.debug(f"Animation sent successfully to {chat_id}")
+            logger.debug(f"Image sent successfully to {chat_id}")  # CHANGED: message text
             return
             
         except RetryAfter as e:
-            logger.warning(f"Telegram rate limit (animation), retrying in {e.retry_after}s...")
+            logger.warning(f"Telegram rate limit (image), retrying in {e.retry_after}s...")  # CHANGED: message text
             time.sleep(e.retry_after)
         except Exception as e:
             error_str = str(e).lower()
@@ -285,11 +285,11 @@ def _send_animation_with_retry(chat_id, video_path):
                 logger.warning(f"SSL error on attempt {attempt+1}, retrying: {e}")
                 time.sleep(Config.TELEGRAM_RETRY_DELAY * (attempt + 1))  # Exponential backoff
             else:
-                logger.warning(f"Attempt {attempt+1} failed to send animation to {chat_id}: {e}")
+                logger.warning(f"Attempt {attempt+1} failed to send image to {chat_id}: {e}")  # CHANGED: message text
                 if attempt < Config.MAX_RETRIES - 1:
                     time.sleep(Config.TELEGRAM_RETRY_DELAY)
     
-    logger.error(f"❌ Failed to send animation to chat_id {chat_id} after {Config.MAX_RETRIES} attempts")
+    logger.error(f"❌ Failed to send image to chat_id {chat_id} after {Config.MAX_RETRIES} attempts")  # CHANGED: message text
 
 def _send_message_with_retry(chat_id, message, reply_markup):
     """Helper function to send message with proper error handling"""
@@ -763,7 +763,7 @@ def send_campaign_summary():
             f"📊 **Progress:** `{percent:.1f}%`"
         )
 
-        keyboard = [[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/contribute")]]
+        keyboard = [[InlineKeyboardButton("💰 Contribute Here", url="https://app.frictionless.network/contribute")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         # Create chart
@@ -1028,7 +1028,7 @@ def campaign_command(update: Update, context: CallbackContext):
         )
         
         # Create proper inline keyboard
-        keyboard = [[InlineKeyboardButton("💰 Contribute Now", url="https://app.frictionless.network/contribute")]]
+        keyboard = [[InlineKeyboardButton("💰 Contribute Here", url="https://app.frictionless.network/contribute")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         # Use reply_markup parameter
