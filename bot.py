@@ -1029,9 +1029,15 @@ def webhook():
     """Telegram webhook endpoint"""
     try:
         if request.method == "POST":
-            update = Update.de_json(request.get_json(force=True), bot)
-            dispatcher.process_update(update)
-        return "ok"
+            json_data = request.get_json(force=True)
+            if json_data:
+                update = Update.de_json(json_data, bot)
+                dispatcher.process_update(update)
+                return "ok", 200
+            else:
+                logger.warning("Received webhook with no JSON data")
+                return "no data", 400
+        return "method not allowed", 405
     except Exception as e:
         logger.error(f"Webhook error: {e}")
         return "error", 500
@@ -1065,10 +1071,20 @@ else:
 webhook_url = os.environ.get('WEBHOOK_URL')
 if webhook_url:
     try:
-        bot.set_webhook(url=f"{webhook_url}/webhook")
-        logger.info(f"Webhook set to {webhook_url}/webhook")
+        # Clear any existing webhook first
+        bot.delete_webhook()
+        time.sleep(1)
+        
+        # Set the new webhook
+        result = bot.set_webhook(url=f"{webhook_url}/webhook")
+        if result:
+            logger.info(f"✅ Webhook set successfully to {webhook_url}/webhook")
+        else:
+            logger.error("❌ Failed to set webhook")
     except Exception as e:
-        logger.error(f"Failed to set webhook: {e}")
+        logger.error(f"❌ Failed to set webhook: {e}")
+else:
+    logger.warning("⚠️ No WEBHOOK_URL configured")
 
 logger.info("🚀 Frictionless Telegram Bot started successfully")
 
