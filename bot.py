@@ -616,12 +616,12 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
         for i, x in enumerate(x_vals[:-1]):
             color_intensity = i / len(x_vals) if len(x_vals) > 1 else 0.5
             ax.barh(bar_y, 1, left=x, height=bar_height, 
-                   color=cmap(color_intensity), alpha=0.6, zorder=3)  # Reduced from 0.9 to 0.6
+                   color=cmap(color_intensity), alpha=0.5, zorder=3)  # Reduced from 0.6 to 0.5
         
         # Add glow effect around progress bar - REDUCED OPACITY
         for i in range(4):
-            glow_alpha = 0.08 * (4-i) / 4  # Reduced from 0.15
-            glow_height = bar_height + 0.08 * (4-i)
+            glow_alpha = 0.04 * (4-i) / 4  # Reduced from 0.08
+            glow_height = bar_height + 0.04 * (4-i)
             ax.barh(bar_y, percent, height=glow_height, 
                    color=colors[0], alpha=glow_alpha, 
                    edgecolor='none', zorder=1)
@@ -716,8 +716,8 @@ def send_campaign_summary():
         # Save with high quality
         img_path = '/tmp/progress_enhanced.png'
         fig.savefig(img_path, bbox_inches='tight', dpi=Config.IMAGE_DPI, 
-                   facecolor='#1a1a1a', edgecolor='none', 
-                   transparent=False, pad_inches=0.15) #Reduced padding from 2
+                   facecolor='none', edgecolor='none', #changed face color from 1a1a1a
+                   transparent=True, pad_inches=0.15) #Reduced padding from 2
 
         # Send to all Telegram chats
         send_campaign_to_chats(img_path, msg, reply_markup)
