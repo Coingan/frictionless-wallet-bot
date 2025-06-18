@@ -1042,7 +1042,7 @@ def staking_command(update: Update, context: CallbackContext):
     """Handle /staking command"""
     staking_text = (
         "💰 *Stake your Frictionless tokens here!*\n\n"
-        "🔗 https://app.altctrl.com/tokens/frictionless/farms/0xA7535B1820c1a0C8680e33E208438058F244B856"
+        "🔗 [Stake](https://app.altctrl.com/tokens/frictionless/farms/0xA7535B1820c1a0C8680e33E208438058F244B856)"
     )
     update.message.reply_text(staking_text, parse_mode='Markdown')
 
