@@ -645,9 +645,9 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
 
     # For other text elements:
     if percent > 10:
-        add_outlined_text_v2(percent/2, bar_y, f'{percent:.1f}%', 16, outline_width=3)
+        add_outlined_text_v2(percent/2, bar_y, Raised = f'{percent:.1f}%', 16, outline_width=3)
     else:
-        add_outlined_text_v2(percent + 8, bar_y, f'{percent:.1f}%', 16, outline_width=3)
+        add_outlined_text_v2(percent + 8, bar_y, Goal = f'{percent:.1f}%', 16, outline_width=3)
     
     # Add value labels with outline - ADJUSTED POSITIONS
     add_outlined_text_v2(5, bar_y - .4, f'${current_usd:,.0f}', 14, 
