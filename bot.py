@@ -3,6 +3,7 @@ import json
 from web3 import Web3
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Dispatcher, CommandHandler, CallbackContext
+from telegram.utils.request import Request
 import os
 import logging
 import threading
@@ -11,6 +12,8 @@ import requests
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as path_effects
 from flask import Flask, request
+import ssl
+import urllib3
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
@@ -105,7 +108,37 @@ w3 = Web3(Web3.HTTPProvider(ETHEREUM_RPC_URL))
 if not w3.is_connected():
     raise ConnectionError("Failed to connect to Ethereum RPC")
 
-bot = Bot(token=TELEGRAM_BOT_TOKEN)
+# Create Telegram bot with SSL context and retry logic
+try:
+    # Create custom request with SSL context
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    
+    # Create request object with retries and timeout
+    telegram_request = Request(
+        connect_timeout=30,
+        read_timeout=30,
+        con_pool_size=8,
+        urllib3_config=urllib3.util.Retry(
+            total=5,
+            backoff_factor=0.3,
+            status_forcelist=[500, 502, 503, 504]
+        )
+    )
+    
+    bot = Bot(token=TELEGRAM_BOT_TOKEN, request=telegram_request)
+    
+    # Test the bot connection
+    logger.info("Testing Telegram bot connection...")
+    bot_info = bot.get_me()
+    logger.info(f"✅ Bot connected successfully: @{bot_info.username}")
+    
+except Exception as e:
+    logger.error(f"❌ Failed to initialize Telegram bot: {e}")
+    # Fallback to basic bot
+    bot = Bot(token=TELEGRAM_BOT_TOKEN)
+
 last_checked = w3.eth.block_number
 transfer_event_sig = w3.keccak(text="Transfer(address,address,uint256)").hex()
 start_time = time.time()
@@ -288,6 +321,8 @@ def get_cached_token_symbol(contract_address):
 def get_cached_token_decimals(contract_address):
     """Get token decimals with aggressive caching"""
     return get_cached_token_info(contract_address)['decimals']
+
+def process_erc20_transfer(log, tx_hash):
     """Process ERC20 transfer events from transaction logs"""
     try:
         # Use safe_web3_call for contract interactions
@@ -639,9 +674,6 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
         ])
         
         return text_obj
-
-    # Usage - removed title line
-    
 
     # For other text elements:
     if percent > 10:
