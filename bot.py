@@ -1015,8 +1015,6 @@ def campaign_command(update: Update, context: CallbackContext):
         current_usd = float(bal_eth) * price_usd
         percent = min(100, (current_usd / CAMPAIGN_TARGET_USD) * 100)
 
-        # Build visual progress bar
-        progress_blocks = "█" * int(percent // 4) + "░" * (25 - int(percent // 4))
         
         # Choose emoji and status text based on progress
         status_emoji, status_text = get_status_emoji_and_text(percent)
@@ -1025,9 +1023,8 @@ def campaign_command(update: Update, context: CallbackContext):
             f"{status_emoji} *{status_text}*\n\n"
             f"💰 **Balance:** `{bal_eth:.4f} ETH`\n"
             f"💵 **Value:** `${current_usd:,.2f}` / `${CAMPAIGN_TARGET_USD:,.2f}`\n"
-            f"📊 **Progress:** `{percent:.1f}%`\n\n"
-            f"```\n{progress_blocks}\n```\n"
-            f"`{percent:.1f}%` Complete"
+            f"📊 **Progress:** `{percent:.1f}%`"
+            
         )
         
         # Create proper inline keyboard
@@ -1054,8 +1051,7 @@ def help_command(update: Update, context: CallbackContext):
     help_text = (
         "📚 *Frictionless Platform Help*\n\n"
         "🔗 [User Guide](https://frictionless-2.gitbook.io/http-www.frictionless.help)\n"
-        "💬 For further support, please submit a ticket through our official Discord\n."
-        "👉 https://discord.gg/kJRk4vFUeZ"
+        "💬 For further support, please submit a ticket through [Discord](https://discord.gg/kJRk4vFUeZ)"
     )
     update.message.reply_text(help_text, parse_mode='Markdown')
 
