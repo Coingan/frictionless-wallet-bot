@@ -650,9 +650,9 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
         add_outlined_text_v2(percent + 8, bar_y, f'{percent:.1f}%', 16, outline_width=3)
     
     # Add value labels with outline - ADJUSTED POSITIONS
-    add_outlined_text_v2(5, bar_y - .55, f'${current_usd:,.0f}', 14, 
+    add_outlined_text_v2(5, bar_y - .5, f'${current_usd:,.0f}', 14, 
                         color='#cccccc', outline_color='black', outline_width=4) #moved down from -.4
-    add_outlined_text_v2(95, bar_y - .55, f'${CAMPAIGN_TARGET_USD:,.0f}', 14, 
+    add_outlined_text_v2(95, bar_y - .5, f'${CAMPAIGN_TARGET_USD:,.0f}', 14, 
                         color='#cccccc', outline_color='black', outline_width=4) #moved down from -.4
     
     # Add decorative elements - REDUCED OPACITY
@@ -717,7 +717,7 @@ def send_campaign_summary():
         img_path = '/tmp/progress_enhanced.png'
         fig.savefig(img_path, bbox_inches='tight', dpi=Config.IMAGE_DPI, 
                    facecolor='#0173CC', edgecolor='none', #changed face color from 1a1a1a
-                   transparent=True, pad_inches=0.1) #Reduced padding from .15
+                   transparent=True, pad_inches=0) #Reduced padding from .15
 
         # Send to all Telegram chats
         send_campaign_to_chats(img_path, msg, reply_markup)
