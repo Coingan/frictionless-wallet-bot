@@ -119,10 +119,21 @@ try:
     
     bot = Bot(token=TELEGRAM_BOT_TOKEN, request=telegram_request)
     
-    # Test the bot connection
+    # Test the bot connection with retry logic for SSL issues
     logger.info("Testing Telegram bot connection...")
-    bot_info = bot.get_me()
-    logger.info(f"✅ Bot connected successfully: @{bot_info.username}")
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            bot_info = bot.get_me()
+            logger.info(f"✅ Bot connected successfully: @{bot_info.username}")
+            break
+        except Exception as e:
+            if attempt < max_retries - 1:
+                logger.warning(f"Connection attempt {attempt + 1} failed: {e}")
+                time.sleep(2)  # Wait before retry
+            else:
+                logger.error(f"❌ All connection attempts failed: {e}")
+                raise
     
 except Exception as e:
     logger.error(f"❌ Failed to initialize Telegram bot with custom request: {e}")
@@ -130,8 +141,19 @@ except Exception as e:
     try:
         # Fallback to basic bot
         bot = Bot(token=TELEGRAM_BOT_TOKEN)
-        bot_info = bot.get_me()
-        logger.info(f"✅ Bot connected successfully with fallback: @{bot_info.username}")
+        
+        # Test fallback connection with retries
+        for attempt in range(3):
+            try:
+                bot_info = bot.get_me()
+                logger.info(f"✅ Bot connected successfully with fallback: @{bot_info.username}")
+                break
+            except Exception as e:
+                if attempt < 2:
+                    logger.warning(f"Fallback attempt {attempt + 1} failed: {e}")
+                    time.sleep(2)
+                else:
+                    raise
     except Exception as fallback_error:
         logger.error(f"❌ Even fallback bot initialization failed: {fallback_error}")
         raise
@@ -258,9 +280,14 @@ def _send_animation_with_retry(chat_id, video_path):
             logger.warning(f"Telegram rate limit (animation), retrying in {e.retry_after}s...")
             time.sleep(e.retry_after)
         except Exception as e:
-            logger.warning(f"Attempt {attempt+1} failed to send animation to {chat_id}: {e}")
-            if attempt < Config.MAX_RETRIES - 1:
-                time.sleep(Config.TELEGRAM_RETRY_DELAY)
+            error_str = str(e).lower()
+            if 'ssl' in error_str or 'decryption failed' in error_str:
+                logger.warning(f"SSL error on attempt {attempt+1}, retrying: {e}")
+                time.sleep(Config.TELEGRAM_RETRY_DELAY * (attempt + 1))  # Exponential backoff
+            else:
+                logger.warning(f"Attempt {attempt+1} failed to send animation to {chat_id}: {e}")
+                if attempt < Config.MAX_RETRIES - 1:
+                    time.sleep(Config.TELEGRAM_RETRY_DELAY)
     
     logger.error(f"❌ Failed to send animation to chat_id {chat_id} after {Config.MAX_RETRIES} attempts")
 
@@ -282,9 +309,14 @@ def _send_message_with_retry(chat_id, message, reply_markup):
             logger.warning(f"Telegram rate limit (message), retrying in {e.retry_after}s...")
             time.sleep(e.retry_after)
         except Exception as e:
-            logger.warning(f"Attempt {attempt+1} failed to send message to {chat_id}: {e}")
-            if attempt < Config.MAX_RETRIES - 1:
-                time.sleep(Config.TELEGRAM_RETRY_DELAY)
+            error_str = str(e).lower()
+            if 'ssl' in error_str or 'decryption failed' in error_str:
+                logger.warning(f"SSL error on attempt {attempt+1}, retrying: {e}")
+                time.sleep(Config.TELEGRAM_RETRY_DELAY * (attempt + 1))  # Exponential backoff
+            else:
+                logger.warning(f"Attempt {attempt+1} failed to send message to {chat_id}: {e}")
+                if attempt < Config.MAX_RETRIES - 1:
+                    time.sleep(Config.TELEGRAM_RETRY_DELAY)
     
     logger.error(f"❌ Failed to send message to chat_id {chat_id} after {Config.MAX_RETRIES} attempts")
 
