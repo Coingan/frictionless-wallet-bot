@@ -18,6 +18,21 @@ import urllib3
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
 
+def admin_only(func):
+    """Decorator to restrict commands to admin users only"""
+    def wrapper(update: Update, context: CallbackContext):
+        user_id = update.effective_user.id
+        username = update.effective_user.username or "unknown"
+        
+        if user_id not in ADMIN_USER_IDS:
+            update.message.reply_text("❌ This command is restricted to administrators only.")
+            logger.warning(f"Unauthorized command attempt by user {user_id} (@{username})")
+            return
+        
+        logger.info(f"Admin command executed by {user_id} (@{username}): {update.message.text}")
+        return func(update, context)
+    return wrapper
+
 class Config:
     BLOCK_CHECK_INTERVAL = 60  # seconds
     SCANNER_ERROR_SLEEP = 30  # seconds
@@ -63,6 +78,7 @@ WALLETS_TO_TRACK = {
 
 GLOBAL_LABEL = "Frictionless Whales"
 EXCLUDED_TO_ADDRESS = "0x4ca9798a36b287f6675429884fab36563f82552d"
+ADMIN_USER_IDS = [int(user_id.strip()) for user_id in os.getenv('ADMIN_USER_IDS', '').split(',') if user_id.strip()]
 
 ERC20_ABI = json.loads('''
 [
@@ -103,6 +119,11 @@ if missing_vars:
 
 if not TELEGRAM_CHAT_IDS:
     raise ValueError("No valid Telegram chat IDs provided")
+
+if not ADMIN_USER_IDS:
+    logger.warning("⚠️ No admin user IDs configured. All admin commands will be inaccessible!")
+else:
+    logger.info(f"✅ Admin access configured for {len(ADMIN_USER_IDS)} user(s)")
 
 w3 = Web3(Web3.HTTPProvider(ETHEREUM_RPC_URL))
 if not w3.is_connected():
@@ -716,9 +737,9 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
         add_outlined_text_v2(percent + 8, bar_y, f'{percent:.1f}%', 16, outline_width=3)
     
     # Add value labels with outline - ADJUSTED POSITIONS
-    add_outlined_text_v2(10, bar_y - .4, "Raised = "f'${current_usd:,.0f}', 14, 
+    add_outlined_text_v2(11, bar_y - .4, "Raised = "f'${current_usd:,.0f}', 14, 
                         color='#cccccc', outline_color='black', outline_width=4) #moved down from -.4
-    add_outlined_text_v2(90, bar_y - .4, "Goal = "f'${CAMPAIGN_TARGET_USD:,.0f}', 14, 
+    add_outlined_text_v2(89, bar_y - .4, "Goal = "f'${CAMPAIGN_TARGET_USD:,.0f}', 14, 
                         color='#cccccc', outline_color='black', outline_width=4) #moved down from -.4
     
     # Removed corners
@@ -879,10 +900,12 @@ def run_summary():
                 time.sleep(Config.SUMMARY_RETRY_SLEEP)
 
 # ---------------- TELEGRAM COMMANDS ---------------- #
+@admin_only
 def start_command(update: Update, context: CallbackContext):
     """Handle /start command"""
     update.message.reply_text("🚀 Frictionless bot is live and tracking blocks.")
 
+@admin_only
 def status_command(update: Update, context: CallbackContext):
     """Handle /status command with performance metrics"""
     try:
@@ -913,6 +936,7 @@ def status_command(update: Update, context: CallbackContext):
     except Exception as e:
         update.message.reply_text(f"❌ Error checking status: {str(e)}")
 
+@admin_only
 def switches_command(update: Update, context: CallbackContext):
     """Handle /switches command"""
     switches = '\n'.join([
@@ -924,6 +948,7 @@ def switches_command(update: Update, context: CallbackContext):
         parse_mode='Markdown'
     )
 
+@admin_only
 def uptime_command(update: Update, context: CallbackContext):
     """Handle /uptime command"""
     uptime_seconds = int(time.time() - start_time)
@@ -931,6 +956,7 @@ def uptime_command(update: Update, context: CallbackContext):
     minutes, seconds = divmod(remainder, 60)
     update.message.reply_text(f"⏱ Bot uptime: {hours}h {minutes}m {seconds}s")
 
+@admin_only
 def config_command(update: Update, context: CallbackContext):
     """Handle /config command - show current configuration"""
     try:
@@ -976,13 +1002,8 @@ def commands_command(update: Update, context: CallbackContext):
     """Handle /commands command"""
     commands_text = (
         "*Available Commands:*\n\n"
-        "`/start` - Show startup confirmation\n"
-        "`/status` - Show current block height and connection status\n"
-        "`/config` - Show bot configuration\n"
         "`/campaign` - Show current campaign status\n"
-        "`/switches` - List all tracked wallet addresses\n"
         "`/staking` - Get Frictionless staking link\n"
-        "`/uptime` - Show bot uptime\n"
         "`/help` - Link to Frictionless Platform User Guide\n"
         "`/commands` - List all available commands"
     )
