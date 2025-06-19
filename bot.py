@@ -72,11 +72,10 @@ SUMMARY_INTERVAL_MINUTES = int(os.getenv('SUMMARY_INTERVAL_MINUTES', '120'))  # 
 STATIC_ETH_PRICE = os.getenv('STATIC_ETH_PRICE')  # Optional static price for testing
 
 WALLETS_TO_TRACK = {
-    '0xd9aD5Acc883D8a67ab612B70C11abF33dD450A45': 'FRIC/ETH',
-    '0xda1916b0d6B209A143009214Cac95e771c4aa277': 'FRIC/ETH'
+    '0x7fC04c569767840d164C9CfC80d66115B8557d3F': 'FRIC/ETH'
 }
 
-GLOBAL_LABEL = "Frictionless Whales"
+GLOBAL_LABEL = "HIBT Fundraising Campaign"
 EXCLUDED_TO_ADDRESS = "0x4ca9798a36b287f6675429884fab36563f82552d"
 ADMIN_USER_IDS = [int(user_id.strip()) for user_id in os.getenv('ADMIN_USER_IDS', '').split(',') if user_id.strip()]
 
