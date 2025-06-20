@@ -631,21 +631,17 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
     
     if os.path.exists(background_image_path):
         try:
-            # Load and process background image
+            # Load background image (NO RESIZING)
             bg_img = Image.open(background_image_path)
-            
-            # Resize to fit chart dimensions
-            chart_width, chart_height = fig.get_size_inches() * fig.dpi
-            bg_img = bg_img.resize((int(chart_width), int(chart_height)), Image.Resampling.LANCZOS)
-            
+        
             # Apply effects to make text readable
             enhancer = ImageEnhance.Brightness(bg_img)
-            bg_img = enhancer.enhance(1.0)  # Darken (0.3 = 30% brightness) changed from .9 to 1.0 to make it brighter
-            
-            # Convert to array and display
+            bg_img = enhancer.enhance(1.0)
+        
+            # Convert to array and display (using original dimensions)
             bg_array = np.array(bg_img)
-            ax.imshow(bg_array, extent=[-2, 102, -1, 1.5], aspect='auto', alpha=.9) #changed from 0.6
-            
+            ax.imshow(bg_array, extent=[-2, 102, -1, 1.5], aspect='auto', alpha=.9)
+        
         except Exception as e:
             logger.warning(f"Could not load background image: {e}")
     
