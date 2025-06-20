@@ -644,7 +644,7 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
             
             # Convert to array and display
             bg_array = np.array(bg_img)
-            ax.imshow(bg_array, extent=[-2, 102, -1, 1.5], aspect='auto', alpha=1) #changed from 0.6
+            ax.imshow(bg_array, extent=[-2, 102, -1, 1.5], aspect='auto', alpha=.9) #changed from 0.6
             
         except Exception as e:
             logger.warning(f"Could not load background image: {e}")
@@ -705,7 +705,7 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
         for i, x in enumerate(x_vals[:-1]):
             color_intensity = i / len(x_vals) if len(x_vals) > 1 else 0.5
             ax.barh(bar_y, 1, left=x, height=bar_height, 
-                   color=cmap(color_intensity), alpha=0.5, zorder=3)  # Reduced from 0.6 to 0.5
+                   color=cmap(color_intensity), alpha=0.6, zorder=3)  # Reduced from 0.6 to 0.5
         
         # Add glow effect around progress bar - REDUCED OPACITY
         for i in range(4):
