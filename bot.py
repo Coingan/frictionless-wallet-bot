@@ -46,7 +46,7 @@ class Config:
     SUMMARY_RETRY_SLEEP = 600  # 10 minutes retry for summary (increased from 60)
     SUMMARY_MAX_CONSECUTIVE_ERRORS = 3  # max consecutive summary errors
     SUMMARY_EXTENDED_SLEEP = 1800  # 30 minutes extended sleep for summary failures
-    IMAGE_DPI = 200  # Summary Image resolution
+    IMAGE_DPI = 120  # Summary Image resolution
     WEB3_RETRY_DELAY = 5  # seconds
     WEB3_MAX_RETRIES = 3  # max retries for web3 calls
 
