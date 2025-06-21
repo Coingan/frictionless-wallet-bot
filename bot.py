@@ -640,7 +640,7 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
         
             # Convert to array and display (using original dimensions)
             bg_array = np.array(bg_img)
-            ax.imshow(bg_array, extent=[-2, 102, -1, 1.5], aspect='auto', alpha=.9)
+            ax.imshow(bg_array, extent=[-2, 102, -1, 1.5], aspect='equal', alpha=.9)
         
         except Exception as e:
             logger.warning(f"Could not load background image: {e}")
