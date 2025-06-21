@@ -631,17 +631,21 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
     
     if os.path.exists(background_image_path):
         try:
-            # Load background image (NO RESIZING)
+            # Load and process background image
             bg_img = Image.open(background_image_path)
-        
+            
+            # Resize to fit chart dimensions
+            chart_width, chart_height = fig.get_size_inches() * fig.dpi
+            bg_img = bg_img.resize((int(chart_width), int(chart_height)), Image.Resampling.LANCZOS)
+            
             # Apply effects to make text readable
             enhancer = ImageEnhance.Brightness(bg_img)
-            bg_img = enhancer.enhance(1.0)
-        
-            # Convert to array and display (using original dimensions)
+            bg_img = enhancer.enhance(1.0)  # Darken (0.3 = 30% brightness) changed from .9 to 1.0 to make it brighter
+            
+            # Convert to array and display
             bg_array = np.array(bg_img)
-            ax.imshow(bg_array, extent=[-2, 102, -17, 17], aspect='auto', alpha=.9)
-        
+            ax.imshow(bg_array, extent=[-2, 102, -1, 1.5], aspect='auto', alpha=.9) #changed from 0.6
+            
         except Exception as e:
             logger.warning(f"Could not load background image: {e}")
     
@@ -663,7 +667,7 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
         
         # Create custom colormap for background
         bg_cmap = LinearSegmentedColormap.from_list('bg_gradient', colors, N=256)
-        ax.imshow(gradient, extent=[-2, 102, -17, 17], aspect='auto', 
+        ax.imshow(gradient, extent=[-2, 102, -1, 1.5], aspect='auto', 
                  cmap=bg_cmap, alpha=0.4, zorder=0)
     
     # Define progress bar colors
@@ -681,8 +685,8 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
     cmap = LinearSegmentedColormap.from_list('progress', colors, N=n_bins)
     
     # Create the main progress bar - MOVED DOWN to avoid text overlap
-    bar_height = 8
-    bar_y = -9.5  # scaled to 13.6x
+    bar_height = 0.6
+    bar_y = -0.7  # Moved up from -0.9
     
     # Background bar (unfilled portion) with subtle glow - MORE TRANSPARENT
     ax.barh(bar_y, 100, height=bar_height, color='#333333', alpha=0.2, 
@@ -690,7 +694,7 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
     
     # Add subtle glow behind the background bar - REDUCED OPACITY
     for i in range(3):
-        ax.barh(bar_y, 100, height=bar_height + 1.36 * (3-i), 
+        ax.barh(bar_y, 100, height=bar_height + 0.1 * (3-i), 
                color='#333333', alpha=0.02 * (i+1), 
                edgecolor='none', zorder=1)
     
@@ -706,7 +710,7 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
         # Add glow effect around progress bar - REDUCED OPACITY
         for i in range(4):
             glow_alpha = 0.04 * (4-i) / 4  # Reduced from 0.08
-            glow_height = bar_height + 0.544 * (4-i)
+            glow_height = bar_height + 0.04 * (4-i)
             ax.barh(bar_y, percent, height=glow_height, 
                    color=colors[0], alpha=glow_alpha, 
                    edgecolor='none', zorder=1)
@@ -732,16 +736,16 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
         add_outlined_text_v2(percent + 8, bar_y, f'{percent:.1f}%', 16, outline_width=3)
     
     # Add value labels with outline - ADJUSTED POSITIONS
-    add_outlined_text_v2(11, bar_y - 5.4, "Raised = "f'${current_usd:,.0f}', 14, 
+    add_outlined_text_v2(11, bar_y - .4, "Raised = "f'${current_usd:,.0f}', 14, 
                         color='#cccccc', outline_color='black', outline_width=4) #moved down from -.4
-    add_outlined_text_v2(89, bar_y - 5.4, "Goal = "f'${CAMPAIGN_TARGET_USD:,.0f}', 14, 
+    add_outlined_text_v2(89, bar_y - .4, "Goal = "f'${CAMPAIGN_TARGET_USD:,.0f}', 14, 
                         color='#cccccc', outline_color='black', outline_width=4) #moved down from -.4
     
     # Removed corners
     
     # Customize the chart
     ax.set_xlim(-2, 102)
-    ax.set_ylim(-17, 17)
+    ax.set_ylim(-1, 1.5)
     ax.axis('off')
     
     return fig
@@ -789,7 +793,7 @@ def send_campaign_summary():
         img_path = '/tmp/progress_enhanced.png'
         fig.savefig(img_path, bbox_inches='tight', dpi=Config.IMAGE_DPI, 
                    facecolor='#95C511', edgecolor='none', #changed face color from 1a1a1a
-                   transparent=True, pad_inches=0.1) #Reduced padding from .15
+                   transparent=True, pad_inches=0) #Reduced padding from .15
 
         # Send to all Telegram chats
         send_campaign_to_chats(img_path, msg, reply_markup)
