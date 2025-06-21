@@ -788,7 +788,7 @@ def send_campaign_summary():
         # Save with high quality
         img_path = '/tmp/progress_enhanced.png'
         fig.savefig(img_path, bbox_inches='tight', dpi=Config.IMAGE_DPI, 
-                   facecolor='transparent', edgecolor='none', #changed face color from 1a1a1a
+                   facecolor='#95C511', edgecolor='none', #changed face color from 1a1a1a
                    transparent=True, pad_inches=0.1) #Reduced padding from .15
 
         # Send to all Telegram chats
