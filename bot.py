@@ -640,7 +640,7 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
         
             # Convert to array and display (using original dimensions)
             bg_array = np.array(bg_img)
-            ax.imshow(bg_array, extent=[-2, 102, -1, 1.5], aspect='equal', alpha=.9)
+            ax.imshow(bg_array, extent=[-2, 102, -17, 17], aspect='auto', alpha=.9)
         
         except Exception as e:
             logger.warning(f"Could not load background image: {e}")
@@ -663,7 +663,7 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
         
         # Create custom colormap for background
         bg_cmap = LinearSegmentedColormap.from_list('bg_gradient', colors, N=256)
-        ax.imshow(gradient, extent=[-2, 102, -1, 1.5], aspect='auto', 
+        ax.imshow(gradient, extent=[-2, 102, -17, 17], aspect='auto', 
                  cmap=bg_cmap, alpha=0.4, zorder=0)
     
     # Define progress bar colors
@@ -681,8 +681,8 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
     cmap = LinearSegmentedColormap.from_list('progress', colors, N=n_bins)
     
     # Create the main progress bar - MOVED DOWN to avoid text overlap
-    bar_height = 0.6
-    bar_y = -0.7  # Moved up from -0.9
+    bar_height = 8
+    bar_y = -9.5  # scaled to 13.6x
     
     # Background bar (unfilled portion) with subtle glow - MORE TRANSPARENT
     ax.barh(bar_y, 100, height=bar_height, color='#333333', alpha=0.2, 
@@ -690,7 +690,7 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
     
     # Add subtle glow behind the background bar - REDUCED OPACITY
     for i in range(3):
-        ax.barh(bar_y, 100, height=bar_height + 0.1 * (3-i), 
+        ax.barh(bar_y, 100, height=bar_height + 1.36 * (3-i), 
                color='#333333', alpha=0.02 * (i+1), 
                edgecolor='none', zorder=1)
     
@@ -706,7 +706,7 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
         # Add glow effect around progress bar - REDUCED OPACITY
         for i in range(4):
             glow_alpha = 0.04 * (4-i) / 4  # Reduced from 0.08
-            glow_height = bar_height + 0.04 * (4-i)
+            glow_height = bar_height + 0.544 * (4-i)
             ax.barh(bar_y, percent, height=glow_height, 
                    color=colors[0], alpha=glow_alpha, 
                    edgecolor='none', zorder=1)
@@ -732,16 +732,16 @@ def create_enhanced_progress_chart(bal_eth, current_usd, percent):
         add_outlined_text_v2(percent + 8, bar_y, f'{percent:.1f}%', 16, outline_width=3)
     
     # Add value labels with outline - ADJUSTED POSITIONS
-    add_outlined_text_v2(11, bar_y - .4, "Raised = "f'${current_usd:,.0f}', 14, 
+    add_outlined_text_v2(11, bar_y - 5.4, "Raised = "f'${current_usd:,.0f}', 14, 
                         color='#cccccc', outline_color='black', outline_width=4) #moved down from -.4
-    add_outlined_text_v2(89, bar_y - .4, "Goal = "f'${CAMPAIGN_TARGET_USD:,.0f}', 14, 
+    add_outlined_text_v2(89, bar_y - 5.4, "Goal = "f'${CAMPAIGN_TARGET_USD:,.0f}', 14, 
                         color='#cccccc', outline_color='black', outline_width=4) #moved down from -.4
     
     # Removed corners
     
     # Customize the chart
     ax.set_xlim(-2, 102)
-    ax.set_ylim(-1, 1.5)
+    ax.set_ylim(-17, 17)
     ax.axis('off')
     
     return fig
